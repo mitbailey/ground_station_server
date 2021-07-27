@@ -160,6 +160,45 @@ private:
 };
 
 /**
+ * @brief 
+ * 
+ * @param buffer 
+ * @param buffer_size 
+ * @return int 
+ */
+int find_ipv4(char *buffer, ssize_t buffer_size);
+
+/**
+ * @brief 
+ * 
+ * @param socket 
+ * @param address 
+ * @param socket_size 
+ * @param tout_s 
+ * @return int 
+ */
+int connect_w_tout(int socket, const struct sockaddr *address, socklen_t socket_size, int tout_s);
+
+/**
+ * @brief 
+ * 
+ * @param network_data 
+ * @param type 
+ * @param endpoint 
+ * @param data 
+ * @param data_size 
+ * @return int 
+ */
+int gs_transmit(NetworkData *network_data, CLIENTSERVER_FRAME_TYPE type, CLIENTSERVER_FRAME_ENDPOINT endpoint, void *data, int data_size);
+
+/**
+ * @brief 
+ * 
+ * @return void* 
+ */
+void *gss_rx_thread(void *);
+
+/**
  * @brief Generates a 16-bit CRC for the given data.
  * 
  * This is the CCITT CRC 16 polynomial X^16  + X^12  + X^5  + 1.

@@ -12,6 +12,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <ifaddrs.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <unistd.h>
 #include "gss.hpp"
 #include "gss_debug.hpp"
 
@@ -186,4 +189,145 @@ int find_ipv4(char *buffer, ssize_t buffer_size)
     }
 
     return 0;
+}
+
+/**
+ * @brief 
+ * 
+ * From:
+ * https://github.com/sunipkmukherjee/comic-mon/blob/master/guimain.cpp
+ * with minor modifications.
+ * 
+ * @param socket 
+ * @param address 
+ * @param socket_size 
+ * @param tout_s 
+ * @return int 
+ */
+int connect_w_tout(int socket, const struct sockaddr *address, socklen_t socket_size, int tout_s)
+{
+    int res;
+    long arg;
+    fd_set myset;
+    struct timeval tv;
+    int valopt;
+    socklen_t lon;
+
+    // Set non-blocking.
+    if ((arg = fcntl(socket, F_GETFL, NULL)) < 0)
+    {
+        dbprintlf(RED_FG "Error fcntl(..., F_GETFL)");
+        erprintlf(errno);
+        return -1;
+    }
+    arg |= O_NONBLOCK;
+    if (fcntl(socket, F_SETFL, arg) < 0)
+    {
+        dbprintlf(RED_FG "Error fcntl(..., F_SETFL)");
+        erprintlf(errno);
+        return -1;
+    }
+
+    // Trying to connect with timeout.
+    res = connect(socket, address, socket_size);
+    if (res < 0)
+    {
+        if (errno == EINPROGRESS)
+        {
+            dbprintlf(YELLOW_FG "EINPROGRESS in connect() - selecting");
+            do
+            {
+                if (tout_s > 0)
+                {
+                    tv.tv_sec = tout_s;
+                }
+                else
+                {
+                    tv.tv_sec = 1; // Minimum 1 second.
+                }
+                tv.tv_usec = 0;
+                FD_ZERO(&myset);
+                FD_SET(socket, &myset);
+                res = select(socket + 1, NULL, &myset, NULL, &tv);
+                if (res < 0 && errno != EINTR)
+                {
+                    dbprintlf(RED_FG "Error connecting.");
+                    erprintlf(errno);
+                    return -1;
+                }
+                else if (res > 0)
+                {
+                    // Socket selected for write.
+                    lon = sizeof(int);
+                    if (getsockopt(socket, SOL_SOCKET, SO_ERROR, (void *)(&valopt), &lon) < 0)
+                    {
+                        dbprintlf(RED_FG "Error in getsockopt()");
+                        erprintlf(errno);
+                        return -1;
+                    }
+
+                    // Check the value returned...
+                    if (valopt)
+                    {
+                        dbprintlf(RED_FG "Error in delayed connection()");
+                        erprintlf(valopt);
+                        return -1;
+                    }
+                    break;
+                }
+                else
+                {
+                    dbprintlf(RED_FG "Timeout in select(), cancelling!");
+                    return -1;
+                }
+            } while (1);
+        }
+        else
+        {
+            fprintf(stderr, "Error connecting %d - %s\n", errno, strerror(errno));
+            dbprintlf(RED_FG "Error connecting.");
+            erprintlf(errno);
+            return -1;
+        }
+    }
+    // Set to blocking mode again...
+    if ((arg = fcntl(socket, F_GETFL, NULL)) < 0)
+    {
+        dbprintlf("Error fcntl(..., F_GETFL)");
+        erprintlf(errno);
+        return -1;
+    }
+    arg &= (~O_NONBLOCK);
+    if (fcntl(socket, F_SETFL, arg) < 0)
+    {
+        dbprintlf("Error fcntl(..., F_GETFL)");
+        erprintlf(errno);
+        return -1;
+    }
+    return socket;
+}
+
+int gs_transmit(NetworkData *network_data, CLIENTSERVER_FRAME_TYPE type, CLIENTSERVER_FRAME_ENDPOINT endpoint, void *data, int data_size)
+{
+    if (data_size < 0)
+    {
+        printf("Error: data_size is %d.\n", data_size);
+        printf("Cancelling transmit.\n");
+        return -1;
+    }
+
+    // Create a ClientServerFrame to send our data in.
+    ClientServerFrame *clientserver_frame = new ClientServerFrame(type, data_size);
+    clientserver_frame->storePayload(endpoint, data, data_size);
+
+    clientserver_frame->sendFrame(network_data);
+
+    return 1;
+}
+
+void *gss_rx_thread(void *)
+{
+    sleep(5);
+    
+    return NULL;
 }
