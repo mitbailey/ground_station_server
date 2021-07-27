@@ -16,19 +16,21 @@
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
+#include <signal.h>
 #include "gss.hpp"
 #include "gss_debug.hpp"
 
 int main(int argc, char *argv[])
 {
+    signal(SIGPIPE, SIG_IGN); // so that client does not die when server does
+
     // Get network data and IP addresses.
     rx_thread_data_t rx_thread_data[1];
-    // rx_thread_data->network_data = new NetworkData();
+
     for (int i = 0; i < 4; i++)
     {
         rx_thread_data->network_data[i] = new NetworkData();
     }
-    // rx_thread_data->network_data->rx_active = true;
 
     // Get local IPv4 and set each rx_thread_data->network_data[i]->ipv4
     char ipv4[32];
@@ -45,9 +47,9 @@ int main(int argc, char *argv[])
     // Set each thread's network_data to have the correct ipv4 and port.
     for (int i = 0; i < 4; i++)
     {
-        memcpy(rx_thread_data->network_data[i]->ipv4, ipv4, sizeof(ipv4));
+        memcpy(rx_thread_data->network_data[i]->listening_ipv4, ipv4, sizeof(ipv4));
         // Ports: 0:51934, 1:51944, 2:51954, 3:51964
-        rx_thread_data->network_data[i]->port = LISTENING_PORT + (10 * i);
+        rx_thread_data->network_data[i]->listening_port = LISTENING_PORT_BASE + (10 * i);
     }
 
     // Activate each thread's receive ability.

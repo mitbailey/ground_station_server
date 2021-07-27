@@ -24,8 +24,8 @@ NetworkData::NetworkData()
 {
     connection_ready = false;
     socket = -1;
-    serv_addr->sin_family = AF_INET;
-    port = LISTENING_PORT;
+    destination_addr->sin_family = AF_INET;
+    listening_port = LISTENING_PORT;
 }
 /// ///
 
@@ -192,137 +192,50 @@ int find_ipv4(char *buffer, ssize_t buffer_size)
     return 0;
 }
 
-/**
- * @brief 
- * 
- * From:
- * https://github.com/sunipkmukherjee/comic-mon/blob/master/guimain.cpp
- * with minor modifications.
- * 
- * @param socket 
- * @param address 
- * @param socket_size 
- * @param tout_s 
- * @return int 
- */
-int connect_w_tout(int socket, const struct sockaddr *address, socklen_t socket_size, int tout_s)
+int gss_transmit(ClientServerFrame *clientserver_frame)
 {
-    int res;
-    long arg;
-    fd_set myset;
-    struct timeval tv;
-    int valopt;
-    socklen_t lon;
-
-    // Set non-blocking.
-    if ((arg = fcntl(socket, F_GETFL, NULL)) < 0)
+    if (!clientserver_frame->checkIntegrity())
     {
-        dbprintlf(RED_FG "Error fcntl(..., F_GETFL)");
-        erprintlf(errno);
-        return -1;
-    }
-    arg |= O_NONBLOCK;
-    if (fcntl(socket, F_SETFL, arg) < 0)
-    {
-        dbprintlf(RED_FG "Error fcntl(..., F_SETFL)");
-        erprintlf(errno);
+        dbprintlf(RED_FG "Transmission cancelled, bad frame integrity.");
         return -1;
     }
 
-    // Trying to connect with timeout.
-    res = connect(socket, address, socket_size);
-    if (res < 0)
-    {
-        if (errno == EINPROGRESS)
-        {
-            dbprintlf(YELLOW_FG "EINPROGRESS in connect() - selecting");
-            do
-            {
-                if (tout_s > 0)
-                {
-                    tv.tv_sec = tout_s;
-                }
-                else
-                {
-                    tv.tv_sec = 1; // Minimum 1 second.
-                }
-                tv.tv_usec = 0;
-                FD_ZERO(&myset);
-                FD_SET(socket, &myset);
-                res = select(socket + 1, NULL, &myset, NULL, &tv);
-                if (res < 0 && errno != EINTR)
-                {
-                    dbprintlf(RED_FG "Error connecting.");
-                    erprintlf(errno);
-                    return -1;
-                }
-                else if (res > 0)
-                {
-                    // Socket selected for write.
-                    lon = sizeof(int);
-                    if (getsockopt(socket, SOL_SOCKET, SO_ERROR, (void *)(&valopt), &lon) < 0)
-                    {
-                        dbprintlf(RED_FG "Error in getsockopt()");
-                        erprintlf(errno);
-                        return -1;
-                    }
+    int endpoint_index = (int)clientserver_frame->getEndpoint();
 
-                    // Check the value returned...
-                    if (valopt)
-                    {
-                        dbprintlf(RED_FG "Error in delayed connection()");
-                        erprintlf(valopt);
-                        return -1;
-                    }
-                    break;
-                }
-                else
-                {
-                    dbprintlf(RED_FG "Timeout in select(), cancelling!");
-                    return -1;
-                }
-            } while (1);
-        }
-        else
-        {
-            fprintf(stderr, "Error connecting %d - %s\n", errno, strerror(errno));
-            dbprintlf(RED_FG "Error connecting.");
-            erprintlf(errno);
-            return -1;
-        }
-    }
-    // Set to blocking mode again...
-    if ((arg = fcntl(socket, F_GETFL, NULL)) < 0)
+    if (endpoint_index > 3)
     {
-        dbprintlf("Error fcntl(..., F_GETFL)");
-        erprintlf(errno);
-        return -1;
-    }
-    arg &= (~O_NONBLOCK);
-    if (fcntl(socket, F_SETFL, arg) < 0)
-    {
-        dbprintlf("Error fcntl(..., F_GETFL)");
-        erprintlf(errno);
-        return -1;
-    }
-    return socket;
-}
-
-int gs_transmit(NetworkData *network_data, CLIENTSERVER_FRAME_TYPE type, CLIENTSERVER_FRAME_ENDPOINT endpoint, void *data, int data_size)
-{
-    if (data_size < 0)
-    {
-        printf("Error: data_size is %d.\n", data_size);
-        printf("Cancelling transmit.\n");
+        dbprintlf(RED_FG "Invalid endpoint index detected (%d).", endpoint_index);
         return -1;
     }
 
-    // Create a ClientServerFrame to send our data in.
-    ClientServerFrame *clientserver_frame = new ClientServerFrame(type, data_size);
-    clientserver_frame->storePayload(endpoint, data, data_size);
+    // Open a connection to the endpoint.
+    NetworkData* network_data = new NetworkData();
+    // struct sockaddr_in dest_addr[1];
+    // int sock = -1;
+    network_data->destination_addr->sin_port = htons(LISTENING_PORT_BASE + (10 * endpoint_index));
 
+    if ((network_data->socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        dbprintlf(RED_FG "Socket creation error.");
+        return -1;
+    }
+
+    // if (inet_pton(AF_INET, destination_ips[endpoint_index], &network_data->destination_addr->sin_addr) <= 0)
+    // {
+    //     dbprintlf(RED_FG "Invalid address; address not supported (%d %s).", endpoint_index, destination_ips[endpoint_index]);
+    //     return -1;
+    // }
+
+    if (connect_w_tout(network_data->socket, (struct sockaddr *) network_data->destination_addr, sizeof(network_data->destination_addr), 1) < 0)
+    {
+        dbprintlf(RED_FG "Connection failed!");
+        return -1;
+    }
+
+    // Connection ready!
+    network_data->connection_ready = true;
     clientserver_frame->sendFrame(network_data);
-
+    
     return 1;
 }
 
@@ -351,8 +264,6 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     {
         strcpy(t_tag, "[RXT_GUICLIENT] ");
         dbprintlf("%sThread (id:%d) listening for GUI Client.", t_tag, (int)thread_id);
-
-        // TODO: Place thread-listening-type specific code in this location in each switch-case (ie, only common code should appear after this switch statement).
 
         break;
     }
@@ -385,10 +296,13 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     }
     }
 
+    // Makes my life easier.
+    NetworkData *network_data = rx_thread_data->network_data[t_index];
+
     // Socket prep.
     int listening_socket, accepted_socket, socket_size;
     struct sockaddr_in listening_address, accepted_address;
-    int buffer_size = sizeof(ClientServerFrame);
+    int buffer_size = sizeof(ClientServerFrame) + 16;
     unsigned char buffer[buffer_size + 1];
     memset(buffer, 0x0, buffer_size);
 
@@ -404,12 +318,12 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     // network_data[i]->ipv4 and ->port already set by main()
 
     listening_address.sin_family = AF_INET;
-    // TODO: Should probably not accept just any address.
+    // Its fine to accept just any address.
     listening_address.sin_addr.s_addr = INADDR_ANY;
-    listening_address.sin_port = htons(rx_thread_data->network_data[t_index]->port);
+    listening_address.sin_port = htons(network_data->listening_port);
 
     // Set the IP address.
-    if (inet_pton(AF_INET, rx_thread_data->network_data[t_index]->ipv4, &listening_address.sin_addr) <= 0)
+    if (inet_pton(AF_INET, network_data->listening_ipv4, &listening_address.sin_addr) <= 0)
     {
         dbprintlf(FATAL "%sInvalid address; address not supported.", t_tag);
         return NULL;
@@ -425,7 +339,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     while (bind(listening_socket, (struct sockaddr *)&listening_address, sizeof(listening_address)) < 0)
     {
         dbprintlf(RED_FG "%sError: Port binding failed.", t_tag);
-        dbprintlf(YELLOW_FG "%s>>> ", t_tag);
+        dbprintf(YELLOW_FG "%s>>> ", t_tag);
         perror("bind");
         sleep(5);
     }
@@ -434,7 +348,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     // Listen.
     listen(listening_socket, 3);
 
-    while (rx_thread_data->network_data[t_index]->rx_active)
+    while (network_data->rx_active)
     {
         int read_size = 0;
 
@@ -464,9 +378,10 @@ void *gss_rx_thread(void *rx_thread_data_vp)
 
         // Read from the socket.
 
-        while (read_size >= 0 && rx_thread_data->network_data[t_index]->rx_active)
+        while (read_size >= 0 && network_data->rx_active)
         {
             dbprintlf("%sBeginning recv... (last read: %d bytes)", t_tag, read_size);
+            memset(buffer, 0x0, buffer_size);
             read_size = recv(accepted_socket, buffer, buffer_size, 0);
             if (read_size > 0)
             {
@@ -488,32 +403,27 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 }
                 dbprintlf("%sIntegrity check successful.", t_tag);
 
-                // Do not extract the payload unless required.
                 switch (clientserver_frame->getEndpoint())
                 {
                 case CS_ENDPOINT_SERVER:
                 {
+                    // Ride ends here, at the server.
+                    // TODO: Parse and do something.
+                    dbprintlf(CYAN_FG "Received a packet for the server!");
                     break;
                 }
                 case CS_ENDPOINT_CLIENT:
-                {
-                    break;
-                }
                 case CS_ENDPOINT_ROOFUHF:
-                {
-                    break;
-                }
                 case CS_ENDPOINT_ROOFXBAND:
-                {
-                    break;
-                }
                 case CS_ENDPOINT_HAYSTACK:
                 {
+                    gss_transmit(clientserver_frame);
                     break;
                 }
                 case CS_ENDPOINT_ERROR:
                 default:
                 {
+                    // Probably received nothing.
                     break;
                 }
                 }

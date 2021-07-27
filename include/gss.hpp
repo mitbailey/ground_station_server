@@ -17,7 +17,7 @@
 #define CLIENTSERVER_FRAME_GUID 0x1A1C
 #define CLIENTSERVER_MAX_PAYLOAD_SIZE 0x64
 #define LISTENING_IP_ADDRESS "127.0.0.1" // hostname -I
-#define LISTENING_PORT 51934
+#define LISTENING_PORT_BASE 54200 // "Base" port, others are factors of this.
 #define LISTENING_SOCKET_TIMEOUT 20
 
 enum CLIENTSERVER_FRAME_TYPE
@@ -42,11 +42,11 @@ enum CLIENTSERVER_FRAME_ENDPOINT
 {
     CS_ENDPOINT_ERROR = -1,
     CS_ENDPOINT_CLIENT = 0,
-    CS_ENDPOINT_SERVER = 1,
-    CS_ENDPOINT_HAYSTACK = 2,
-    CS_ENDPOINT_ROOFXBAND = 3,
-    CS_ENDPOINT_ROOFUHF = 4,
-    CS_ENDPOINT_SPACEHAUC = 5
+    CS_ENDPOINT_ROOFUHF,
+    CS_ENDPOINT_ROOFXBAND,
+    CS_ENDPOINT_HAYSTACK,
+    CS_ENDPOINT_SERVER
+    // CS_ENDPOINT_SPACEHAUC // probably dont need this one, SH can be inferred (all nonconfig cs_frames sent to TX radios...)
 };
 
 enum CLIENTSERVER_FRAME_MODE
@@ -63,10 +63,10 @@ public:
 
     // Network
     int socket;
-    struct sockaddr_in serv_addr[1];
+    struct sockaddr_in destination_addr[1];
     bool connection_ready;
-    char ipv4[32];
-    int port;
+    char listening_ipv4[32];
+    int listening_port;
 
     // Booleans
     bool rx_active; // Only able to receive when this is true.
