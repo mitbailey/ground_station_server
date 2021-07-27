@@ -159,6 +159,26 @@ private:
     uint16_t termination;
 };
 
+enum LISTEN_FOR
+{
+    LF_ERROR = -1,
+    LF_CLIENT = 0,
+    LF_ROOF_UHF,
+    LF_ROOF_XBAND,
+    LF_HAYSTACK
+};
+
+/**
+ * @brief Data structure used to store arguments for rx_threads as a void pointer.
+ * 
+ */
+typedef struct
+{
+    NetworkData *network_data;
+    // LISTEN_FOR listen_for;
+    pthread_t pid[4];
+} rx_thread_data_t;
+
 /**
  * @brief 
  * 

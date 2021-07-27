@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <unistd.h>
+#include <pthread.h>
 #include "gss.hpp"
 #include "gss_debug.hpp"
 
@@ -325,9 +326,62 @@ int gs_transmit(NetworkData *network_data, CLIENTSERVER_FRAME_TYPE type, CLIENTS
     return 1;
 }
 
-void *gss_rx_thread(void *)
+void *gss_rx_thread(void *rx_thread_data_vp)
 {
-    sleep(5);
-    
+    rx_thread_data_t *rx_thread_data = (rx_thread_data_t *)rx_thread_data_vp;
+
+    LISTEN_FOR listen_for = LF_ERROR;
+    pthread_t thread_id = pthread_self();
+
+    for (int i = 0; i < 4; i++)
+    {
+        if (thread_id == rx_thread_data->pid[i])
+        {
+            listen_for = (LISTEN_FOR)i;
+        }
+    }
+
+    char t_tag[32];
+
+    switch (listen_for)
+    {
+    case LF_CLIENT:
+    {
+        strcpy(t_tag, "[RXT_GUICLIENT] ");
+        dbprintlf("%sThread (id:%d) listening for GUI Client.", t_tag, (int)thread_id);
+
+        // TODO: Place thread-listening-type specific code in this location in each switch-case (ie, only common code should appear after this switch statement).
+
+        break;
+    }
+    case LF_ROOF_UHF:
+    {
+        strcpy(t_tag, "[RXT_ROOFUHF] ");
+        dbprintlf("%sThread (id:%d) listening for Roof UHF.", t_tag, (int)thread_id);
+
+        break;
+    }
+    case LF_ROOF_XBAND:
+    {
+        strcpy(t_tag, "[RXT_ROOFXBAND] ");
+        dbprintlf("%sThread (id:%d) listening for Roof X-Band.", t_tag, (int)thread_id);
+
+        break;
+    }
+    case LF_HAYSTACK:
+    {
+        strcpy(t_tag, "[RXT_HAYSTACK] ");
+        dbprintlf("%sThread (id:%d) listening for Haystack.", t_tag, (int)thread_id);
+
+        break;
+    }
+    case LF_ERROR:
+    default:
+    {
+        dbprintlf(FATAL "[RXT_ERROR] Thread (id:%d) not listening for any valid sender.", (int)thread_id);
+        return NULL;
+    }
+    }
+
     return NULL;
 }
