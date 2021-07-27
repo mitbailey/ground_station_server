@@ -23,17 +23,37 @@ int main(int argc, char *argv[])
 {
     // Get network data and IP addresses.
     rx_thread_data_t rx_thread_data[1];
-    rx_thread_data->network_data = new NetworkData();
+    // rx_thread_data->network_data = new NetworkData();
+    for (int i = 0; i < 4; i++)
+    {
+        rx_thread_data->network_data[i] = new NetworkData();
+    }
+    // rx_thread_data->network_data->rx_active = true;
 
-    if (!find_ipv4(rx_thread_data->network_data->ipv4, sizeof(rx_thread_data->network_data->ipv4)))
+    // Get local IPv4 and set each rx_thread_data->network_data[i]->ipv4
+    char ipv4[32];
+    if (!find_ipv4(ipv4, sizeof(ipv4)))
     {
         dbprintlf(YELLOW_FG "Failed to auto-detect local IPv4! Using default (%s).", LISTENING_IP_ADDRESS);
-        char temp[] = LISTENING_IP_ADDRESS;
-        memcpy(rx_thread_data->network_data->ipv4, temp, sizeof(temp));
+        strcpy(ipv4, LISTENING_IP_ADDRESS);
     }
     else
     {
-        dbprintlf(BLUE_FG "Auto-detected local IPv4: %s", rx_thread_data->network_data->ipv4);
+        dbprintlf(BLUE_FG "Auto-detected local IPv4: %s", ipv4);
+    }
+
+    // Set each thread's network_data to have the correct ipv4 and port.
+    for (int i = 0; i < 4; i++)
+    {
+        memcpy(rx_thread_data->network_data[i]->ipv4, ipv4, sizeof(ipv4));
+        // Ports: 0:51934, 1:51944, 2:51954, 3:51964
+        rx_thread_data->network_data[i]->port = LISTENING_PORT + (10 * i);
+    }
+
+    // Activate each thread's receive ability.
+    for (int i = 0; i < 4; i++)
+    {
+        rx_thread_data->network_data[i]->rx_active = true;
     }
 
     // Begin receiver threads.
@@ -71,7 +91,10 @@ int main(int argc, char *argv[])
     // - Accept, perform relevant actions, and respond.
 
     // Finished.
-    delete rx_thread_data->network_data;
+    for (int i = 0; i < 4; i++)
+    {
+        delete rx_thread_data->network_data[i];
+    }
 
     return 1;
 }

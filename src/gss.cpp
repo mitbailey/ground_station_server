@@ -331,6 +331,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     rx_thread_data_t *rx_thread_data = (rx_thread_data_t *)rx_thread_data_vp;
 
     LISTEN_FOR listen_for = LF_ERROR;
+    int t_index = -1;
     pthread_t thread_id = pthread_self();
 
     for (int i = 0; i < 4; i++)
@@ -338,6 +339,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
         if (thread_id == rx_thread_data->pid[i])
         {
             listen_for = (LISTEN_FOR)i;
+            t_index = i;
         }
     }
 
@@ -381,6 +383,161 @@ void *gss_rx_thread(void *rx_thread_data_vp)
         dbprintlf(FATAL "[RXT_ERROR] Thread (id:%d) not listening for any valid sender.", (int)thread_id);
         return NULL;
     }
+    }
+
+    // Socket prep.
+    int listening_socket, accepted_socket, socket_size;
+    struct sockaddr_in listening_address, accepted_address;
+    int buffer_size = sizeof(ClientServerFrame);
+    unsigned char buffer[buffer_size + 1];
+    memset(buffer, 0x0, buffer_size);
+
+    // Create socket.
+    listening_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (listening_socket == -1)
+    {
+        dbprintlf(FATAL "%sCould not create socket.", t_tag);
+        return NULL;
+    }
+    dbprintlf(GREEN_FG "%sSocket created.", t_tag);
+
+    // network_data[i]->ipv4 and ->port already set by main()
+
+    listening_address.sin_family = AF_INET;
+    // TODO: Should probably not accept just any address.
+    listening_address.sin_addr.s_addr = INADDR_ANY;
+    listening_address.sin_port = htons(rx_thread_data->network_data[t_index]->port);
+
+    // Set the IP address.
+    if (inet_pton(AF_INET, rx_thread_data->network_data[t_index]->ipv4, &listening_address.sin_addr) <= 0)
+    {
+        dbprintlf(FATAL "%sInvalid address; address not supported.", t_tag);
+        return NULL;
+    }
+
+    // Set the timeout for recv, which will allow us to reconnect to poorly disconnected clients.
+    struct timeval timeout;
+    timeout.tv_sec = LISTENING_SOCKET_TIMEOUT;
+    timeout.tv_usec = 0;
+    setsockopt(listening_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout));
+
+    // Bind.
+    while (bind(listening_socket, (struct sockaddr *)&listening_address, sizeof(listening_address)) < 0)
+    {
+        dbprintlf(RED_FG "%sError: Port binding failed.", t_tag);
+        dbprintlf(YELLOW_FG "%s>>> ", t_tag);
+        perror("bind");
+        sleep(5);
+    }
+    dbprintlf(GREEN_FG "%sBound to port.", t_tag);
+
+    // Listen.
+    listen(listening_socket, 3);
+
+    while (rx_thread_data->network_data[t_index]->rx_active)
+    {
+        int read_size = 0;
+
+        // Accept an incoming connection.
+        dbprintlf("%sWaiting for incoming connections...", t_tag);
+        socket_size = sizeof(struct sockaddr_in);
+
+        // Accept connection from an incoming client.
+        accepted_socket = accept(listening_socket, (struct sockaddr *)&accepted_address, (socklen_t *)&socket_size);
+        if (accepted_socket < 0)
+        {
+            if (errno == EAGAIN)
+            {
+                // Waiting for connection timed-out.
+                continue;
+            }
+            else
+            {
+                dbprintlf(YELLOW_FG "%s>>> ", t_tag);
+                perror("accept failed");
+                continue;
+            }
+        }
+        dbprintlf(CYAN_FG "%sConnection accepted.", t_tag);
+
+        // We are now connected.
+
+        // Read from the socket.
+
+        while (read_size >= 0 && rx_thread_data->network_data[t_index]->rx_active)
+        {
+            dbprintlf("%sBeginning recv... (last read: %d bytes)", t_tag, read_size);
+            read_size = recv(accepted_socket, buffer, buffer_size, 0);
+            if (read_size > 0)
+            {
+                dbprintf("%sRECEIVED (hex): ", t_tag);
+                for (int i = 0; i < read_size; i++)
+                {
+                    printf("%02x", buffer[i]);
+                }
+                printf("(END)\n");
+
+                // TODO: Parse the data.
+                ClientServerFrame *clientserver_frame = (ClientServerFrame *)buffer;
+
+                // Check if we've received data in the form of a ClientServerFrame.
+                if (clientserver_frame->checkIntegrity() < 0)
+                {
+                    dbprintlf("%sIntegrity check failed (%d).", t_tag, clientserver_frame->checkIntegrity());
+                    continue;
+                }
+                dbprintlf("%sIntegrity check successful.", t_tag);
+
+                // Do not extract the payload unless required.
+                switch (clientserver_frame->getEndpoint())
+                {
+                case CS_ENDPOINT_SERVER:
+                {
+                    break;
+                }
+                case CS_ENDPOINT_CLIENT:
+                {
+                    break;
+                }
+                case CS_ENDPOINT_ROOFUHF:
+                {
+                    break;
+                }
+                case CS_ENDPOINT_ROOFXBAND:
+                {
+                    break;
+                }
+                case CS_ENDPOINT_HAYSTACK:
+                {
+                    break;
+                }
+                case CS_ENDPOINT_ERROR:
+                default:
+                {
+                    break;
+                }
+                }
+            }
+            else
+            {
+                break;
+            }
+        }
+        if (read_size == 0)
+        {
+            dbprintlf(CYAN_BG "%sClient closed connection.", t_tag);
+            continue;
+        }
+        else if (errno == EAGAIN)
+        {
+            dbprintlf(YELLOW_BG "%sActive connection timed-out (%d).", t_tag, read_size);
+            continue;
+        }
+    }
+
+    if (!rx_thread_data->network_data[t_index]->rx_active)
+    {
+        dbprintlf(YELLOW_FG "%sReceive deactivated.", t_tag);
     }
 
     return NULL;
