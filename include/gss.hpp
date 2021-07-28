@@ -202,13 +202,10 @@ int connect_w_tout(int socket, const struct sockaddr *address, socklen_t socket_
  * @brief 
  * 
  * @param network_data 
- * @param type 
- * @param endpoint 
- * @param data 
- * @param data_size 
+ * @param clientserver_frame 
  * @return int 
  */
-int gs_transmit(NetworkData *network_data, CLIENTSERVER_FRAME_TYPE type, CLIENTSERVER_FRAME_ENDPOINT endpoint, void *data, int data_size);
+int gss_transmit(NetworkData **network_data, ClientServerFrame *clientserver_frame);
 
 /**
  * @brief 

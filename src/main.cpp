@@ -13,6 +13,10 @@
  * 
  */
 
+// TODO: Set Netstat
+// TODO: Send (or receive?) periodic null packets.
+// NOTE: Leave packets destined for the server alone - no configs yet.
+
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
@@ -48,7 +52,7 @@ int main(int argc, char *argv[])
     for (int i = 0; i < 4; i++)
     {
         memcpy(rx_thread_data->network_data[i]->listening_ipv4, ipv4, sizeof(ipv4));
-        // Ports: 0:51934, 1:51944, 2:51954, 3:51964
+
         rx_thread_data->network_data[i]->listening_port = LISTENING_PORT_BASE + (10 * i);
     }
 

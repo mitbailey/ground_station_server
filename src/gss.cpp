@@ -25,7 +25,7 @@ NetworkData::NetworkData()
     connection_ready = false;
     socket = -1;
     destination_addr->sin_family = AF_INET;
-    listening_port = LISTENING_PORT;
+    listening_port = LISTENING_PORT_BASE;
 }
 /// ///
 
@@ -155,13 +155,19 @@ ssize_t ClientServerFrame::sendFrame(NetworkData *network_data)
         return -1;
     }
 
+    if (network_data->socket < 0)
+    {
+        dbprintlf(RED_FG "Invalid socket.");
+        return -1;
+    }
+
     if (!checkIntegrity())
     {
         dbprintlf(YELLOW_FG "Integrity check failed, send aborted.");
         return -1;
     }
 
-    printf("Sending the following:\n");
+    printf("Sending the following (%d):\n", network_data->socket);
     print();
 
     return send(network_data->socket, this, sizeof(ClientServerFrame), 0);
@@ -192,7 +198,7 @@ int find_ipv4(char *buffer, ssize_t buffer_size)
     return 0;
 }
 
-int gss_transmit(ClientServerFrame *clientserver_frame)
+int gss_transmit(NetworkData **network_data, ClientServerFrame *clientserver_frame)
 {
     if (!clientserver_frame->checkIntegrity())
     {
@@ -208,34 +214,16 @@ int gss_transmit(ClientServerFrame *clientserver_frame)
         return -1;
     }
 
-    // Open a connection to the endpoint.
-    NetworkData* network_data = new NetworkData();
-    // struct sockaddr_in dest_addr[1];
-    // int sock = -1;
-    network_data->destination_addr->sin_port = htons(LISTENING_PORT_BASE + (10 * endpoint_index));
-
-    if ((network_data->socket = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    if (!(network_data[endpoint_index]->connection_ready))
     {
-        dbprintlf(RED_FG "Socket creation error.");
-        return -1;
-    }
-
-    // if (inet_pton(AF_INET, destination_ips[endpoint_index], &network_data->destination_addr->sin_addr) <= 0)
-    // {
-    //     dbprintlf(RED_FG "Invalid address; address not supported (%d %s).", endpoint_index, destination_ips[endpoint_index]);
-    //     return -1;
-    // }
-
-    if (connect_w_tout(network_data->socket, (struct sockaddr *) network_data->destination_addr, sizeof(network_data->destination_addr), 1) < 0)
-    {
-        dbprintlf(RED_FG "Connection failed!");
+        dbprintlf(RED_FG "Endpoint (%d) has not connected; connection not ready.", endpoint_index);
         return -1;
     }
 
     // Connection ready!
-    network_data->connection_ready = true;
-    clientserver_frame->sendFrame(network_data);
-    
+    network_data[endpoint_index]->connection_ready = true;
+    clientserver_frame->sendFrame(network_data[endpoint_index]);
+
     return 1;
 }
 
@@ -300,7 +288,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     NetworkData *network_data = rx_thread_data->network_data[t_index];
 
     // Socket prep.
-    int listening_socket, accepted_socket, socket_size;
+    int listening_socket, socket_size;
     struct sockaddr_in listening_address, accepted_address;
     int buffer_size = sizeof(ClientServerFrame) + 16;
     unsigned char buffer[buffer_size + 1];
@@ -315,12 +303,10 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     }
     dbprintlf(GREEN_FG "%sSocket created.", t_tag);
 
-    // network_data[i]->ipv4 and ->port already set by main()
-
     listening_address.sin_family = AF_INET;
     // Its fine to accept just any address.
     listening_address.sin_addr.s_addr = INADDR_ANY;
-    listening_address.sin_port = htons(network_data->listening_port);
+    listening_address.sin_port = htons(network_data->listening_port + (10 * t_index));
 
     // Set the IP address.
     if (inet_pton(AF_INET, network_data->listening_ipv4, &listening_address.sin_addr) <= 0)
@@ -343,7 +329,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
         perror("bind");
         sleep(5);
     }
-    dbprintlf(GREEN_FG "%sBound to port.", t_tag);
+    dbprintlf(GREEN_FG "%sBound to port %d.", t_tag, network_data->listening_port);
 
     // Listen.
     listen(listening_socket, 3);
@@ -357,8 +343,8 @@ void *gss_rx_thread(void *rx_thread_data_vp)
         socket_size = sizeof(struct sockaddr_in);
 
         // Accept connection from an incoming client.
-        accepted_socket = accept(listening_socket, (struct sockaddr *)&accepted_address, (socklen_t *)&socket_size);
-        if (accepted_socket < 0)
+        network_data->socket = accept(listening_socket, (struct sockaddr *)&accepted_address, (socklen_t *)&socket_size);
+        if (network_data->socket < 0)
         {
             if (errno == EAGAIN)
             {
@@ -375,6 +361,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
         dbprintlf(CYAN_FG "%sConnection accepted.", t_tag);
 
         // We are now connected.
+        network_data->connection_ready = true;
 
         // Read from the socket.
 
@@ -382,7 +369,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
         {
             dbprintlf("%sBeginning recv... (last read: %d bytes)", t_tag, read_size);
             memset(buffer, 0x0, buffer_size);
-            read_size = recv(accepted_socket, buffer, buffer_size, 0);
+            read_size = recv(network_data->socket, buffer, buffer_size, 0);
             if (read_size > 0)
             {
                 dbprintf("%sRECEIVED (hex): ", t_tag);
@@ -392,7 +379,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 }
                 printf("(END)\n");
 
-                // TODO: Parse the data.
+                // Parse the data.
                 ClientServerFrame *clientserver_frame = (ClientServerFrame *)buffer;
 
                 // Check if we've received data in the form of a ClientServerFrame.
@@ -408,7 +395,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 case CS_ENDPOINT_SERVER:
                 {
                     // Ride ends here, at the server.
-                    // TODO: Parse and do something.
+                    // NOTE: Parse and do something. maybe, we'll see.
                     dbprintlf(CYAN_FG "Received a packet for the server!");
                     break;
                 }
@@ -417,7 +404,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 case CS_ENDPOINT_ROOFXBAND:
                 case CS_ENDPOINT_HAYSTACK:
                 {
-                    gss_transmit(clientserver_frame);
+                    gss_transmit(&network_data, clientserver_frame);
                     break;
                 }
                 case CS_ENDPOINT_ERROR:
