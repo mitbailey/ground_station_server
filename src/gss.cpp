@@ -65,10 +65,17 @@ int ClientServerFrame::storePayload(CLIENTSERVER_FRAME_ENDPOINT endpoint, void *
         return -1;
     }
 
-    memcpy(payload, data, size);
+    if (data == NULL)
+    {
+        printf("Prepping null packet.");
+    }
+    else
+    {
+        memcpy(payload, data, size);
+    }
 
-    crc1 = crc16(payload, payload_size);
-    crc2 = crc16(payload, payload_size);
+    crc1 = crc16(payload, CLIENTSERVER_MAX_PAYLOAD_SIZE);
+    crc2 = crc16(payload, CLIENTSERVER_MAX_PAYLOAD_SIZE);
 
     this->endpoint = endpoint;
 
@@ -117,7 +124,7 @@ int ClientServerFrame::checkIntegrity()
     {
         return -6;
     }
-    else if (crc1 != crc16(payload, payload_size))
+    else if (crc1 != crc16(payload, CLIENTSERVER_MAX_PAYLOAD_SIZE))
     {
         return -7;
     }
