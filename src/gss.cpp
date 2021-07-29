@@ -421,11 +421,14 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 if (clientserver_frame->getType() == CS_TYPE_NULL)
                 {
                     dbprintlf("Received a null (status) packet, responding.");
+                    clientserver_frame->storePayload(CS_ENDPOINT_CLIENT, NULL, 0);
+                    
                     clientserver_frame->setNetstat(
                         rx_thread_data->network_data[0]->connection_ready,
                         rx_thread_data->network_data[1]->connection_ready,
                         rx_thread_data->network_data[2]->connection_ready,
                         rx_thread_data->network_data[3]->connection_ready);
+                    
                     gss_transmit(&network_data, clientserver_frame);
                 }
 
@@ -467,11 +470,13 @@ void *gss_rx_thread(void *rx_thread_data_vp)
         if (read_size == 0)
         {
             dbprintlf(CYAN_BG "%sClient closed connection.", t_tag);
+            network_data->connection_ready = false;
             continue;
         }
         else if (errno == EAGAIN)
         {
             dbprintlf(YELLOW_BG "%sActive connection timed-out (%d).", t_tag, read_size);
+            network_data->connection_ready = false;
             continue;
         }
     }
