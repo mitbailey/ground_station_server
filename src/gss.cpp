@@ -54,7 +54,7 @@ ClientServerFrame::ClientServerFrame(CLIENTSERVER_FRAME_TYPE type, int payload_s
     netstat = 0; // Will be set by the server.
     termination = 0xAAAA;
 
-    memset(payload, 0x0, this->payload_size);
+    memset(payload, 0x0, CLIENTSERVER_MAX_PAYLOAD_SIZE);
 }
 
 int ClientServerFrame::storePayload(CLIENTSERVER_FRAME_ENDPOINT endpoint, void *data, int size)
@@ -157,7 +157,7 @@ ssize_t ClientServerFrame::sendFrame(NetworkData *network_data)
 
     if (network_data->socket < 0)
     {
-        dbprintlf(RED_FG "Invalid socket.");
+        dbprintlf(RED_FG "Invalid socket (%d).", network_data->socket);
         return -1;
     }
 
@@ -171,6 +171,27 @@ ssize_t ClientServerFrame::sendFrame(NetworkData *network_data)
     print();
 
     return send(network_data->socket, this, sizeof(ClientServerFrame), 0);
+}
+
+void ClientServerFrame::setNetstat(bool client, bool roof_uhf, bool roof_xband, bool haystack)
+{
+    netstat & 0x0;
+    if (client)
+    {
+        netstat |= 0x80;
+    }
+    if (roof_uhf)
+    {
+        netstat |= 0x40;
+    }
+    if (roof_xband)
+    {
+        netstat |= 0x20;
+    }
+    if (haystack)
+    {
+        netstat |= 0x10;
+    }
 }
 /// ///
 
@@ -404,6 +425,11 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 case CS_ENDPOINT_ROOFXBAND:
                 case CS_ENDPOINT_HAYSTACK:
                 {
+                    clientserver_frame->setNetstat(
+                        rx_thread_data->network_data[0]->connection_ready,
+                        rx_thread_data->network_data[1]->connection_ready,
+                        rx_thread_data->network_data[2]->connection_ready,
+                        rx_thread_data->network_data[3]->connection_ready);
                     gss_transmit(&network_data, clientserver_frame);
                     break;
                 }

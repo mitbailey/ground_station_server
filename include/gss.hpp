@@ -117,6 +117,16 @@ public:
     uint8_t getNetstat() { return netstat; };
 
     /**
+     * @brief Set the Netstat object
+     * 
+     * @param client
+     * @param roof_uhf
+     * @param roof_xband
+     * @param haystack
+     */
+    void setNetstat(bool client, bool roof_uhf, bool roof_xband, bool haystack);
+
+    /**
      * @brief Checks the validity of itself.
      * 
      * @return int Positive if valid, negative if invalid.
