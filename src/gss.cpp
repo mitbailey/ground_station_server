@@ -418,6 +418,17 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 }
                 dbprintlf("%sIntegrity check successful.", t_tag);
 
+                if (clientserver_frame->getType() == CS_TYPE_NULL)
+                {
+                    dbprintlf("Received a null (status) packet, responding.");
+                    clientserver_frame->setNetstat(
+                        rx_thread_data->network_data[0]->connection_ready,
+                        rx_thread_data->network_data[1]->connection_ready,
+                        rx_thread_data->network_data[2]->connection_ready,
+                        rx_thread_data->network_data[3]->connection_ready);
+                    gss_transmit(&network_data, clientserver_frame);
+                }
+
                 switch (clientserver_frame->getEndpoint())
                 {
                 case CS_ENDPOINT_SERVER:
