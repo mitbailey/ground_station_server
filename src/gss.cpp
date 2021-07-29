@@ -61,13 +61,13 @@ int ClientServerFrame::storePayload(CLIENTSERVER_FRAME_ENDPOINT endpoint, void *
 {
     if (size > payload_size)
     {
-        printf("Cannot store data of size larger than allocated payload size (%d > %d).\n", size, payload_size);
+        dbprintlf("Cannot store data of size larger than allocated payload size (%d > %d).", size, payload_size);
         return -1;
     }
 
     if (data == NULL)
     {
-        printf("Prepping null packet.");
+        dbprintlf("Prepping null packet.");
     }
     else
     {
@@ -418,20 +418,6 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 }
                 dbprintlf("%sIntegrity check successful.", t_tag);
 
-                if (clientserver_frame->getType() == CS_TYPE_NULL)
-                {
-                    dbprintlf("Received a null (status) packet, responding.");
-                    clientserver_frame->storePayload(CS_ENDPOINT_CLIENT, NULL, 0);
-                    
-                    clientserver_frame->setNetstat(
-                        rx_thread_data->network_data[0]->connection_ready,
-                        rx_thread_data->network_data[1]->connection_ready,
-                        rx_thread_data->network_data[2]->connection_ready,
-                        rx_thread_data->network_data[3]->connection_ready);
-                    
-                    gss_transmit(&network_data, clientserver_frame);
-                }
-
                 switch (clientserver_frame->getEndpoint())
                 {
                 case CS_ENDPOINT_SERVER:
@@ -439,6 +425,23 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                     // Ride ends here, at the server.
                     // NOTE: Parse and do something. maybe, we'll see.
                     dbprintlf(CYAN_FG "Received a packet for the server!");
+                    if (clientserver_frame->getType() == CS_TYPE_NULL)
+                    {
+                        dbprintlf("Received a null (status) packet, responding.");
+                        clientserver_frame->storePayload(CS_ENDPOINT_CLIENT, NULL, 0);
+
+                        clientserver_frame->setNetstat(
+                            rx_thread_data->network_data[0]->connection_ready,
+                            rx_thread_data->network_data[1]->connection_ready,
+                            rx_thread_data->network_data[2]->connection_ready,
+                            rx_thread_data->network_data[3]->connection_ready);
+
+                        gss_transmit(&network_data, clientserver_frame);
+                    }
+                    else
+                    {
+                        dbprintlf(RED_FG "Frame addressed to server but was not a Null (status) frame!");
+                    }
                     break;
                 }
                 case CS_ENDPOINT_CLIENT:
@@ -446,6 +449,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 case CS_ENDPOINT_ROOFXBAND:
                 case CS_ENDPOINT_HAYSTACK:
                 {
+                    dbprintlf("Passing along frame.");
                     clientserver_frame->setNetstat(
                         rx_thread_data->network_data[0]->connection_ready,
                         rx_thread_data->network_data[1]->connection_ready,
