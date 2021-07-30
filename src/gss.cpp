@@ -334,7 +334,10 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     listening_address.sin_family = AF_INET;
     // Its fine to accept just any address.
     listening_address.sin_addr.s_addr = INADDR_ANY;
-    listening_address.sin_port = htons(network_data->listening_port + (10 * t_index));
+
+    // Calculate and set port.
+    network_data->listening_port = LISTENING_PORT_BASE + (10 * t_index);
+    listening_address.sin_port = htons(network_data->listening_port);
 
     // Set the IP address.
     if (inet_pton(AF_INET, network_data->listening_ipv4, &listening_address.sin_addr) <= 0)
