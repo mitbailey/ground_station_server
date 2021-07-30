@@ -3,9 +3,9 @@
 Code for SPACE-HAUC's Ground Station Server.
 
 ### Testing
-2021.07.29
-Successfully receives, gets, and sends status info.
-
+2021.07.29  
+Successfully receives, gets, and sends status info.  
+  
 2021.07.27b
 Successfully accepts connection from Client, receives frames, and sends frames.
 
