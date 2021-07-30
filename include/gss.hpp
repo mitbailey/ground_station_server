@@ -32,7 +32,7 @@ enum LISTEN_FOR
  * 
  */
 typedef struct
-{  
+{
     NetworkData *network_data[4];
     pthread_t pid[4];
 } rx_thread_data_t;

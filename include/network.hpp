@@ -136,12 +136,12 @@ public:
     ssize_t sendFrame(NetworkData *network_data);
 
 private:
-    uint16_t guid;                                        // 0x1A1C
-    NETWORK_FRAME_ENDPOINT endpoint;                 // Where is this going?
-    NETWORK_FRAME_MODE mode;                         // RX or TX
-    int payload_size;                                     // Variably sized payload, this value tracks the size.
-    NETWORK_FRAME_TYPE type;                         // NULL, ACK, NACK, CONFIG, DATA, STATUS
-    uint16_t crc1;                                        // CRC16 of payload.
+    uint16_t guid;                                         // 0x1A1C
+    NETWORK_FRAME_ENDPOINT endpoint;                       // Where is this going?
+    NETWORK_FRAME_MODE mode;                               // RX or TX
+    int payload_size;                                      // Variably sized payload, this value tracks the size.
+    NETWORK_FRAME_TYPE type;                               // NULL, ACK, NACK, CONFIG, DATA, STATUS
+    uint16_t crc1;                                         // CRC16 of payload.
     unsigned char payload[NETWORK_FRAME_MAX_PAYLOAD_SIZE]; // Constant sized payload.
     uint16_t crc2;
     uint8_t netstat;      // Network Status Information - Read by the client, set by the server: Bitmask - 0:Client, 1:RoofUHF, 2: RoofXB, 3: Haystack
