@@ -1,5 +1,5 @@
 CXX = g++
-COBJS = src/main.o src/gss.o
+COBJS = src/main.o src/gss.o src/network.o
 CXXFLAGS = -I ./include/ -Wall -pthread
 TARGET = server.out
 

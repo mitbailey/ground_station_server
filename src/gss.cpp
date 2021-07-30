@@ -16,193 +16,11 @@
 #include <errno.h>
 #include <unistd.h>
 #include <pthread.h>
+#include "network.hpp"
 #include "gss.hpp"
-#include "gss_debug.hpp"
+#include "meb_debug.hpp"
 
-/// NetworkData Class
-NetworkData::NetworkData()
-{
-    connection_ready = false;
-    socket = -1;
-    destination_addr->sin_family = AF_INET;
-    listening_port = LISTENING_PORT_BASE;
-}
-/// ///
-
-/// ClientServerFrame Class
-ClientServerFrame::ClientServerFrame(CLIENTSERVER_FRAME_TYPE type, int payload_size)
-{
-    if (type < 0)
-    {
-        printf("ClientServerFrame initialized with error type (%d).\n", (int)type);
-        return;
-    }
-
-    if (payload_size > CLIENTSERVER_MAX_PAYLOAD_SIZE)
-    {
-        printf("Cannot allocate payload larger than %d bytes.\n", CLIENTSERVER_MAX_PAYLOAD_SIZE);
-        return;
-    }
-
-    this->payload_size = payload_size;
-    this->type = type;
-    // TODO: Set the mode properly.
-    mode = CS_MODE_ERROR;
-    crc1 = -1;
-    crc2 = -1;
-    guid = CLIENTSERVER_FRAME_GUID;
-    netstat = 0; // Will be set by the server.
-    termination = 0xAAAA;
-
-    memset(payload, 0x0, CLIENTSERVER_MAX_PAYLOAD_SIZE);
-}
-
-int ClientServerFrame::storePayload(CLIENTSERVER_FRAME_ENDPOINT endpoint, void *data, int size)
-{
-    if (size > payload_size)
-    {
-        dbprintlf("Cannot store data of size larger than allocated payload size (%d > %d).", size, payload_size);
-        return -1;
-    }
-
-    if (data == NULL)
-    {
-        dbprintlf("Prepping null packet.");
-    }
-    else
-    {
-        memcpy(payload, data, size);
-    }
-
-    crc1 = crc16(payload, CLIENTSERVER_MAX_PAYLOAD_SIZE);
-    crc2 = crc16(payload, CLIENTSERVER_MAX_PAYLOAD_SIZE);
-
-    this->endpoint = endpoint;
-
-    // TODO: Placeholder until I figure out when / why to set mode to TX or RX.
-    mode = CS_MODE_RX;
-
-    return 1;
-}
-
-int ClientServerFrame::retrievePayload(unsigned char *data_space, int size)
-{
-    if (size != payload_size)
-    {
-        printf("Data space size not equal to payload size (%d != %d).\n", size, payload_size);
-        return -1;
-    }
-
-    memcpy(data_space, payload, payload_size);
-
-    return 1;
-}
-
-int ClientServerFrame::checkIntegrity()
-{
-    if (guid != CLIENTSERVER_FRAME_GUID)
-    {
-        return -1;
-    }
-    else if (endpoint < 0)
-    {
-        return -2;
-    }
-    else if (mode < 0)
-    {
-        return -3;
-    }
-    else if (payload_size < 0 || payload_size > CLIENTSERVER_MAX_PAYLOAD_SIZE)
-    {
-        return -4;
-    }
-    else if (type < 0)
-    {
-        return -5;
-    }
-    else if (crc1 != crc2)
-    {
-        return -6;
-    }
-    else if (crc1 != crc16(payload, CLIENTSERVER_MAX_PAYLOAD_SIZE))
-    {
-        return -7;
-    }
-    else if (termination != 0xAAAA)
-    {
-        return -8;
-    }
-
-    return 1;
-}
-
-void ClientServerFrame::print()
-{
-    printf("GUID ------------ 0x%04x\n", guid);
-    printf("Endpoint -------- %d\n", endpoint);
-    printf("Mode ------------ %d\n", mode);
-    printf("Payload Size ---- %d\n", payload_size);
-    printf("Type ------------ %d\n", type);
-    printf("CRC1 ------------ 0x%04x\n", crc1);
-    printf("Payload ---- (HEX)");
-    for (int i = 0; i < payload_size; i++)
-    {
-        printf(" 0x%04x", payload[i]);
-    }
-    printf("\n");
-    printf("CRC2 ------------ 0x%04x\n", crc2);
-    printf("Termination ----- 0x%04x\n", termination);
-}
-
-ssize_t ClientServerFrame::sendFrame(NetworkData *network_data)
-{
-    if (!(network_data->connection_ready))
-    {
-        dbprintlf(YELLOW_FG "Connection is not ready.");
-        return -1;
-    }
-
-    if (network_data->socket < 0)
-    {
-        dbprintlf(RED_FG "Invalid socket (%d).", network_data->socket);
-        return -1;
-    }
-
-    if (!checkIntegrity())
-    {
-        dbprintlf(YELLOW_FG "Integrity check failed, send aborted.");
-        return -1;
-    }
-
-    printf("Sending the following (%d):\n", network_data->socket);
-    print();
-
-    return send(network_data->socket, this, sizeof(ClientServerFrame), 0);
-}
-
-void ClientServerFrame::setNetstat(bool client, bool roof_uhf, bool roof_xband, bool haystack)
-{
-    netstat & 0x0;
-    if (client)
-    {
-        netstat |= 0x80;
-    }
-    if (roof_uhf)
-    {
-        netstat |= 0x40;
-    }
-    if (roof_xband)
-    {
-        netstat |= 0x20;
-    }
-    if (haystack)
-    {
-        netstat |= 0x10;
-    }
-}
-/// ///
-
-int find_ipv4(char *buffer, ssize_t buffer_size)
+int gss_find_ipv4(char *buffer, ssize_t buffer_size)
 {
     struct ifaddrs *addr, *temp_addr;
     getifaddrs(&addr);
@@ -226,34 +44,34 @@ int find_ipv4(char *buffer, ssize_t buffer_size)
     return 0;
 }
 
-int gss_transmit(NetworkData **network_data, ClientServerFrame *clientserver_frame)
-{
-    if (!clientserver_frame->checkIntegrity())
-    {
-        dbprintlf(RED_FG "Transmission cancelled, bad frame integrity.");
-        return -1;
-    }
+// int gss_transmit(NetworkData **network_data, NetworkFrame *clientserver_frame)
+// {
+//     if (!clientserver_frame->checkIntegrity())
+//     {
+//         dbprintlf(RED_FG "Transmission cancelled, bad frame integrity.");
+//         return -1;
+//     }
 
-    int endpoint_index = (int)clientserver_frame->getEndpoint();
+//     int endpoint_index = (int)clientserver_frame->getEndpoint();
 
-    if (endpoint_index > 3)
-    {
-        dbprintlf(RED_FG "Invalid endpoint index detected (%d).", endpoint_index);
-        return -1;
-    }
+//     if (endpoint_index > 3)
+//     {
+//         dbprintlf(RED_FG "Invalid endpoint index detected (%d).", endpoint_index);
+//         return -1;
+//     }
 
-    if (!(network_data[endpoint_index]->connection_ready))
-    {
-        dbprintlf(RED_FG "Endpoint (%d) has not connected; connection not ready.", endpoint_index);
-        return -1;
-    }
+//     if (!(network_data[endpoint_index]->connection_ready))
+//     {
+//         dbprintlf(RED_FG "Endpoint (%d) has not connected; connection not ready.", endpoint_index);
+//         return -1;
+//     }
 
-    // Connection ready!
-    network_data[endpoint_index]->connection_ready = true;
-    clientserver_frame->sendFrame(network_data[endpoint_index]);
+//     // Connection ready!
+//     network_data[endpoint_index]->connection_ready = true;
+//     clientserver_frame->sendFrame(network_data[endpoint_index]);
 
-    return 1;
-}
+//     return 1;
+// }
 
 void *gss_rx_thread(void *rx_thread_data_vp)
 {
@@ -318,7 +136,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     // Socket prep.
     int listening_socket, socket_size;
     struct sockaddr_in listening_address, accepted_address;
-    int buffer_size = sizeof(ClientServerFrame) + 16;
+    int buffer_size = sizeof(NetworkFrame) + 16;
     unsigned char buffer[buffer_size + 1];
     memset(buffer, 0x0, buffer_size);
 
@@ -411,9 +229,9 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 printf("(END)\n");
 
                 // Parse the data.
-                ClientServerFrame *clientserver_frame = (ClientServerFrame *)buffer;
+                NetworkFrame *clientserver_frame = (NetworkFrame *)buffer;
 
-                // Check if we've received data in the form of a ClientServerFrame.
+                // Check if we've received data in the form of a NetworkFrame.
                 if (clientserver_frame->checkIntegrity() < 0)
                 {
                     dbprintlf("%sIntegrity check failed (%d).", t_tag, clientserver_frame->checkIntegrity());
@@ -439,7 +257,11 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                             rx_thread_data->network_data[2]->connection_ready,
                             rx_thread_data->network_data[3]->connection_ready);
 
-                        gss_transmit(&network_data, clientserver_frame);
+                        // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
+                        if (clientserver_frame->sendFrame(rx_thread_data->network_data[(int)clientserver_frame->getEndpoint()]) < 0)
+                        {
+                            dbprintlf(RED_FG "Send failed!");
+                        }
                     }
                     else
                     {
@@ -458,7 +280,12 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                         rx_thread_data->network_data[1]->connection_ready,
                         rx_thread_data->network_data[2]->connection_ready,
                         rx_thread_data->network_data[3]->connection_ready);
-                    gss_transmit(&network_data, clientserver_frame);
+
+                    // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
+                    if (clientserver_frame->sendFrame(rx_thread_data->network_data[(int)clientserver_frame->getEndpoint()]) < 0)
+                    {
+                        dbprintlf(RED_FG "Send failed!");
+                    }
                     break;
                 }
                 case CS_ENDPOINT_ERROR:

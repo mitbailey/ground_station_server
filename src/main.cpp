@@ -7,7 +7,7 @@
  * 
  * This program will run on the Ground Station Server, a central throughway-hub for handling communications between the 
  * three radios and the GUI Client. It will include RX threads, a transmission method, parsing, and error handling.
- * Communication is done via a ClientServerFrame.
+ * Communication is done via a NetworkFrame.
  * 
  * @copyright Copyright (c) 2021
  * 
@@ -22,7 +22,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include "gss.hpp"
-#include "gss_debug.hpp"
+#include "meb_debug.hpp"
 
 int main(int argc, char *argv[])
 {
@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
 
     // Get local IPv4 and set each rx_thread_data->network_data[i]->ipv4
     char ipv4[32];
-    if (!find_ipv4(ipv4, sizeof(ipv4)))
+    if (!gss_find_ipv4(ipv4, sizeof(ipv4)))
     {
         dbprintlf(YELLOW_FG "Failed to auto-detect local IPv4! Using default (%s).", LISTENING_IP_ADDRESS);
         strcpy(ipv4, LISTENING_IP_ADDRESS);
