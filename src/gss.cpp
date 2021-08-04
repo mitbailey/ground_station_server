@@ -170,6 +170,10 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     timeout.tv_usec = 0;
     setsockopt(listening_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout));
 
+    // This allows us to crash the server, reboot, and still get all of our socket connections ready even thought theyre in a TIME_WAIT state.
+    int enable = 1;
+    setsockopt(listening_socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
+
     // Bind.
     while (bind(listening_socket, (struct sockaddr *)&listening_address, sizeof(listening_address)) < 0)
     {
