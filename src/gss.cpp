@@ -229,36 +229,37 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 printf("(END)\n");
 
                 // Parse the data.
-                NetworkFrame *clientserver_frame = (NetworkFrame *)buffer;
+                NetworkFrame *network_frame = (NetworkFrame *)buffer;
 
                 // Check if we've received data in the form of a NetworkFrame.
-                if (clientserver_frame->checkIntegrity() < 0)
+                if (network_frame->checkIntegrity() < 0)
                 {
-                    dbprintlf("%sIntegrity check failed (%d).", t_tag, clientserver_frame->checkIntegrity());
+                    dbprintlf("%sIntegrity check failed (%d).", t_tag, network_frame->checkIntegrity());
                     continue;
                 }
                 dbprintlf("%sIntegrity check successful.", t_tag);
 
-                switch (clientserver_frame->getEndpoint())
+                switch (network_frame->getEndpoint())
                 {
                 case CS_ENDPOINT_SERVER:
                 {
                     // Ride ends here, at the server.
                     // NOTE: Parse and do something. maybe, we'll see.
                     dbprintlf(CYAN_FG "Received a packet for the server!");
-                    if (clientserver_frame->getType() == CS_TYPE_NULL)
+                    if (network_frame->getType() == CS_TYPE_NULL)
                     {
                         dbprintlf("Received a null (status) packet, responding.");
-                        clientserver_frame->storePayload(CS_ENDPOINT_CLIENT, NULL, 0);
+                        // Send the null frame to whomever asked for it.
+                        network_frame->storePayload((NETWORK_FRAME_ENDPOINT)t_index, NULL, 0);
 
-                        clientserver_frame->setNetstat(
+                        network_frame->setNetstat(
                             rx_thread_data->network_data[0]->connection_ready,
                             rx_thread_data->network_data[1]->connection_ready,
                             rx_thread_data->network_data[2]->connection_ready,
                             rx_thread_data->network_data[3]->connection_ready);
 
                         // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
-                        if (clientserver_frame->sendFrame(rx_thread_data->network_data[(int)clientserver_frame->getEndpoint()]) < 0)
+                        if (network_frame->sendFrame(rx_thread_data->network_data[(int)network_frame->getEndpoint()]) < 0)
                         {
                             dbprintlf(RED_FG "Send failed!");
                         }
@@ -275,14 +276,14 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 case CS_ENDPOINT_HAYSTACK:
                 {
                     dbprintlf("Passing along frame.");
-                    clientserver_frame->setNetstat(
+                    network_frame->setNetstat(
                         rx_thread_data->network_data[0]->connection_ready,
                         rx_thread_data->network_data[1]->connection_ready,
                         rx_thread_data->network_data[2]->connection_ready,
                         rx_thread_data->network_data[3]->connection_ready);
 
                     // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
-                    if (clientserver_frame->sendFrame(rx_thread_data->network_data[(int)clientserver_frame->getEndpoint()]) < 0)
+                    if (network_frame->sendFrame(rx_thread_data->network_data[(int)network_frame->getEndpoint()]) < 0)
                     {
                         dbprintlf(RED_FG "Send failed!");
                     }
