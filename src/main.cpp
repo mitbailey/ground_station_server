@@ -5,17 +5,17 @@
  * @version 0.1
  * @date 2021.07.26
  * 
- * This program will run on the Ground Station Server, a central throughway-hub for handling communications between the 
- * three radios and the GUI Client. It will include RX threads, a transmission method, parsing, and error handling.
- * Communication is done via a NetworkFrame.
+ * This program is the Ground Station Network Server (GSNS), a central throughway-hub for handling communications between the three radios and GUI Client. It includes an RX thread for each potential client, and methods of transmission, parsing, and error handling. Communication along the network is done via NetworkFrames.
  * 
  * @copyright Copyright (c) 2021
  * 
  */
 
-// TODO: Set Netstat
-// TODO: Send (or receive?) periodic null packets.
+// Now sets Netstat.
+// Receives and then sends status-filled null packets.
 // NOTE: Leave packets destined for the server alone - no configs yet.
+//       Frames destined for the server and are NULL are polling for status.
+//       Non-NULL frames for the server must be a config (NYI), or an error.
 
 #include <stdio.h>
 #include <string.h>
