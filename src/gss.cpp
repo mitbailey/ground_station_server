@@ -44,35 +44,6 @@ int gss_find_ipv4(char *buffer, ssize_t buffer_size)
     return 0;
 }
 
-// int gss_transmit(NetworkData **network_data, NetworkFrame *clientserver_frame)
-// {
-//     if (!clientserver_frame->checkIntegrity())
-//     {
-//         dbprintlf(RED_FG "Transmission cancelled, bad frame integrity.");
-//         return -1;
-//     }
-
-//     int endpoint_index = (int)clientserver_frame->getEndpoint();
-
-//     if (endpoint_index > 3)
-//     {
-//         dbprintlf(RED_FG "Invalid endpoint index detected (%d).", endpoint_index);
-//         return -1;
-//     }
-
-//     if (!(network_data[endpoint_index]->connection_ready))
-//     {
-//         dbprintlf(RED_FG "Endpoint (%d) has not connected; connection not ready.", endpoint_index);
-//         return -1;
-//     }
-
-//     // Connection ready!
-//     network_data[endpoint_index]->connection_ready = true;
-//     clientserver_frame->sendFrame(network_data[endpoint_index]);
-
-//     return 1;
-// }
-
 void *gss_rx_thread(void *rx_thread_data_vp)
 {
     rx_thread_data_t *rx_thread_data = (rx_thread_data_t *)rx_thread_data_vp;
@@ -192,7 +163,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
         int read_size = 0;
 
         // Accept an incoming connection.
-        dbprintlf("%sWaiting for incoming connections...", t_tag);
+        // dbprintlf("%sWaiting for incoming connections...", t_tag);
         socket_size = sizeof(struct sockaddr_in);
 
         // Accept connection from an incoming client.

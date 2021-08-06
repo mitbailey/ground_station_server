@@ -17,7 +17,7 @@
 #define NETWORK_FRAME_MAX_PAYLOAD_SIZE 0x64
 #define NETWORK_FRAME_GUID 0x1A1C
 #define NETWORK_FRAME_MAX_PAYLOAD_SIZE 0x64
-#define LISTENING_PORT_BASE 54200 // "Base" port, others are factors of this.
+#define LISTENING_PORT_BASE 54200 // "Base" port, others are additives of this.
 
 enum NETWORK_FRAME_TYPE
 {

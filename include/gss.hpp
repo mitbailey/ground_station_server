@@ -18,6 +18,10 @@
 #define LISTENING_IP_ADDRESS "127.0.0.1" // hostname -I
 #define LISTENING_SOCKET_TIMEOUT 20
 
+/**
+ * @brief Enumeration representing what client each RX thread is listening for.
+ * 
+ */
 enum LISTEN_FOR
 {
     LF_ERROR = -1,
@@ -38,29 +42,20 @@ typedef struct
 } rx_thread_data_t;
 
 /**
- * @brief 
+ * @brief Automatically finds the local machine's IPv4.
  * 
- * @param buffer 
- * @param buffer_size 
- * @return int 
+ * @param buffer Buffer to store the IPv4 as a c-string.
+ * @param buffer_size Size of passed buffer.
+ * @return int 1 if successful, 0 if an IPv4 could not be found.
  */
 int gss_find_ipv4(char *buffer, ssize_t buffer_size);
 
 /**
- * @brief 
+ * @brief Thread which waits to receive network data.
  * 
- * @param socket 
- * @param address 
- * @param socket_size 
- * @param tout_s 
- * @return int 
- */
-int gss_connect(int socket, const struct sockaddr *address, socklen_t socket_size, int tout_s);
-
-/**
- * @brief 
+ * Four of these are started, one for each expected possible client.
  * 
- * @return void* 
+ * @return void* NULL
  */
 void *gss_rx_thread(void *);
 
