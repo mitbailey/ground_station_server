@@ -36,18 +36,6 @@ int main(int argc, char *argv[])
         rx_thread_data->network_data[i] = new NetworkData();
     }
 
-    // // Get local IPv4 and set each rx_thread_data->network_data[i]->ipv4
-    // char ipv4[32];
-    // if (!gss_find_ipv4(ipv4, sizeof(ipv4)))
-    // {
-    //     dbprintlf(YELLOW_FG "Failed to auto-detect local IPv4! Using default (%s).", LISTENING_IP_ADDRESS);
-    //     strcpy(ipv4, LISTENING_IP_ADDRESS);
-    // }
-    // else
-    // {
-    //     dbprintlf(BLUE_FG "Auto-detected local IPv4: %s", ipv4);
-    // }
-
     // Set each thread's network_data to have the correct ipv4 and port.
     for (int i = 0; i < 4; i++)
     {
