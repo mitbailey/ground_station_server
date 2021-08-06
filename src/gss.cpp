@@ -128,13 +128,6 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     network_data->listening_port = LISTENING_PORT_BASE + (10 * t_index);
     listening_address.sin_port = htons(network_data->listening_port);
 
-    // // Set the IP address.
-    // if (inet_pton(AF_INET, network_data->listening_ipv4, &listening_address.sin_addr) <= 0)
-    // {
-    //     dbprintlf(FATAL "%sInvalid address; address not supported.", t_tag);
-    //     return NULL;
-    // }
-
     // Set the timeout for recv, which will allow us to reconnect to poorly disconnected clients.
     struct timeval timeout;
     timeout.tv_sec = LISTENING_SOCKET_TIMEOUT;
@@ -163,7 +156,6 @@ void *gss_rx_thread(void *rx_thread_data_vp)
         int read_size = 0;
 
         // Accept an incoming connection.
-        // dbprintlf("%sWaiting for incoming connections...", t_tag);
         socket_size = sizeof(struct sockaddr_in);
 
         // Accept connection from an incoming client.
