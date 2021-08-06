@@ -56,7 +56,7 @@ public:
     int socket;
     struct sockaddr_in destination_addr[1];
     bool connection_ready;
-    char listening_ipv4[32];
+    // char listening_ipv4[32];
     int listening_port;
 
     // Booleans
