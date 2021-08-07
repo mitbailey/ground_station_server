@@ -68,35 +68,35 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     case LF_CLIENT:
     {
         strcpy(t_tag, "[RXT_GUICLIENT] ");
-        dbprintlf("%sThread (id:%d) listening for GUI Client.", t_tag, (int)thread_id);
-
+        dbprintlf("%sThread (id:%lu) listening for GUI Client.", t_tag, (unsigned long)thread_id);
+        
         break;
     }
     case LF_ROOF_UHF:
     {
         strcpy(t_tag, "[RXT_ROOFUHF] ");
-        dbprintlf("%sThread (id:%d) listening for Roof UHF.", t_tag, (int)thread_id);
+        dbprintlf("%sThread (id:%lu) listening for Roof UHF.", t_tag, (unsigned long)thread_id);
 
         break;
     }
     case LF_ROOF_XBAND:
     {
         strcpy(t_tag, "[RXT_ROOFXBAND] ");
-        dbprintlf("%sThread (id:%d) listening for Roof X-Band.", t_tag, (int)thread_id);
+        dbprintlf("%sThread (id:%lu) listening for Roof X-Band.", t_tag, (unsigned long)thread_id);
 
         break;
     }
     case LF_HAYSTACK:
     {
         strcpy(t_tag, "[RXT_HAYSTACK] ");
-        dbprintlf("%sThread (id:%d) listening for Haystack.", t_tag, (int)thread_id);
+        dbprintlf("%sThread (id:%lu) listening for Haystack.", t_tag, (unsigned long)thread_id);
 
         break;
     }
     case LF_ERROR:
     default:
     {
-        dbprintlf(FATAL "[RXT_ERROR] Thread (id:%d) not listening for any valid sender.", (int)thread_id);
+        dbprintlf(FATAL "[RXT_ERROR] Thread (id:%lu) not listening for any valid sender.", (unsigned long)thread_id);
         return NULL;
     }
     }
