@@ -69,7 +69,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     {
         strcpy(t_tag, "[RXT_GUICLIENT] ");
         dbprintlf("%sThread (id:%lu) listening for GUI Client.", t_tag, (unsigned long)thread_id);
-        
+
         break;
     }
     case LF_ROOF_UHF:
@@ -165,6 +165,12 @@ void *gss_rx_thread(void *rx_thread_data_vp)
             if (errno == EAGAIN)
             {
                 // Waiting for connection timed-out.
+                dbprintlf("%sTimed out (NETSTAT %d %d %d %d).", t_tag,
+                                  rx_thread_data->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
+                                  rx_thread_data->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
+                                  rx_thread_data->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
+                                  rx_thread_data->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0);
+                network_data->connection_ready = false;
                 continue;
             }
             else
@@ -212,18 +218,41 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 {
                     // Ride ends here, at the server.
                     // NOTE: Parse and do something. maybe, we'll see.
-                    dbprintlf(CYAN_FG "Received a packet for the server!");
+                    dbprintlf(CYAN_FG "Received a packet for the server from ID:%d!", t_index);
                     if (network_frame->getType() == CS_TYPE_NULL)
                     {
                         dbprintlf("Received a null (status) packet, responding.");
+
+                        // If this thread is listening for Roof X-Band or Haystack (and therefore is receiving the null status packet from one of them), we should read in their config statuses to the global.
+                        // Otherwise, write the currently known XBand config statuses.
+                        if (t_index == LF_ROOF_XBAND)
+                        {
+                            memcpy(rx_thread_data->roofxband_config_status, network_frame->roofxband_config_status, sizeof(rx_thread_data_t));
+                        }
+                        else if (t_index == LF_HAYSTACK)
+                        {
+                            memcpy(rx_thread_data->haystack_config_status, network_frame->haystack_config_status, sizeof(rx_thread_data_t));
+                        }
+                        else
+                        {
+                            memcpy(network_frame->roofxband_config_status, rx_thread_data->roofxband_config_status, sizeof(rx_thread_data_t));
+                            memcpy(network_frame->haystack_config_status, rx_thread_data->haystack_config_status, sizeof(rx_thread_data_t));
+                        }
+
                         // Send the null frame to whomever asked for it.
                         network_frame->storePayload((NETWORK_FRAME_ENDPOINT)t_index, NULL, 0);
 
                         network_frame->setNetstat(
-                            rx_thread_data->network_data[0]->connection_ready,
-                            rx_thread_data->network_data[1]->connection_ready,
-                            rx_thread_data->network_data[2]->connection_ready,
-                            rx_thread_data->network_data[3]->connection_ready);
+                            rx_thread_data->network_data[LF_CLIENT]->connection_ready,
+                            rx_thread_data->network_data[LF_ROOF_UHF]->connection_ready,
+                            rx_thread_data->network_data[LF_ROOF_XBAND]->connection_ready,
+                            rx_thread_data->network_data[LF_HAYSTACK]->connection_ready);
+
+                        dbprintlf("NETSTAT %d %d %d %d",
+                                  rx_thread_data->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
+                                  rx_thread_data->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
+                                  rx_thread_data->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
+                                  rx_thread_data->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0);
 
                         // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
                         if (network_frame->sendFrame(rx_thread_data->network_data[(int)network_frame->getEndpoint()]) < 0)
@@ -244,10 +273,16 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 {
                     dbprintlf("Passing along frame.");
                     network_frame->setNetstat(
-                        rx_thread_data->network_data[0]->connection_ready,
-                        rx_thread_data->network_data[1]->connection_ready,
-                        rx_thread_data->network_data[2]->connection_ready,
-                        rx_thread_data->network_data[3]->connection_ready);
+                        rx_thread_data->network_data[LF_CLIENT]->connection_ready,
+                        rx_thread_data->network_data[LF_ROOF_UHF]->connection_ready,
+                        rx_thread_data->network_data[LF_ROOF_XBAND]->connection_ready,
+                        rx_thread_data->network_data[LF_HAYSTACK]->connection_ready);
+
+                    dbprintlf("NETSTAT %d %d %d %d",
+                              rx_thread_data->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
+                              rx_thread_data->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
+                              rx_thread_data->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
+                              rx_thread_data->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0);
 
                     // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
                     if (network_frame->sendFrame(rx_thread_data->network_data[(int)network_frame->getEndpoint()]) < 0)

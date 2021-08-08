@@ -39,6 +39,9 @@ typedef struct
 {
     NetworkData *network_data[4];
     pthread_t pid[4];
+
+    phy_config_t roofxband_config_status[1];
+    phy_config_t haystack_config_status[1];
 } rx_thread_data_t;
 
 /**

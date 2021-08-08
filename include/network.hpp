@@ -18,6 +18,25 @@
 #define NETWORK_FRAME_MAX_PAYLOAD_SIZE 0x100
 #define LISTENING_PORT_BASE 54200 // "Base" port, others are additives of this.
 
+/**
+ * @brief X-Band configuration status information to be filled by the radios, sent to the server, and then to the client.
+ * 
+ */
+typedef struct
+{
+    int mode;               // 0:SLEEP, 1:FDD, 2:TDD
+    int pll_freq;           // PLL Frequency
+    uint64_t LO;            // LO freq
+    uint64_t samp;          // sampling rate
+    uint64_t bw;            // bandwidth
+    char ftr_name[64];      // filter name
+    int temp;               // temperature
+    double rssi;            // RSSI
+    double gain;            // TX Gain
+    char curr_gainmode[16]; // fast_attack or slow_attack
+    bool pll_lock;
+} phy_config_t;
+
 enum NETWORK_FRAME_TYPE
 {
     CS_TYPE_ERROR = -1,       // Something is wrong.
@@ -132,6 +151,9 @@ public:
      * @return ssize_t Number of bytes sent if successful, negative on failure. 
      */
     ssize_t sendFrame(NetworkData *network_data);
+
+    phy_config_t roofxband_config_status[1];
+    phy_config_t haystack_config_status[1];
 
 private:
     uint16_t guid;                                         // 0x1A1C
