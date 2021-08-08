@@ -223,22 +223,6 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                     {
                         dbprintlf("Received a null (status) packet, responding.");
 
-                        // If this thread is listening for Roof X-Band or Haystack (and therefore is receiving the null status packet from one of them), we should read in their config statuses to the global.
-                        // Otherwise, write the currently known XBand config statuses.
-                        if (t_index == LF_ROOF_XBAND)
-                        {
-                            memcpy(rx_thread_data->roofxband_config_status, network_frame->roofxband_config_status, sizeof(rx_thread_data_t));
-                        }
-                        else if (t_index == LF_HAYSTACK)
-                        {
-                            memcpy(rx_thread_data->haystack_config_status, network_frame->haystack_config_status, sizeof(rx_thread_data_t));
-                        }
-                        else
-                        {
-                            memcpy(network_frame->roofxband_config_status, rx_thread_data->roofxband_config_status, sizeof(rx_thread_data_t));
-                            memcpy(network_frame->haystack_config_status, rx_thread_data->haystack_config_status, sizeof(rx_thread_data_t));
-                        }
-
                         // Send the null frame to whomever asked for it.
                         network_frame->storePayload((NETWORK_FRAME_ENDPOINT)t_index, NULL, 0);
 
