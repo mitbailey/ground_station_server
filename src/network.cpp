@@ -169,8 +169,8 @@ ssize_t NetworkFrame::sendFrame(NetworkData *network_data)
         return -1;
     }
 
-    printf("Sending the following (%d):\n", network_data->socket);
-    print();
+    // printf("Sending the following (%d):\n", network_data->socket);
+    // print();
 
     return send(network_data->socket, this, sizeof(NetworkFrame), 0);
 }
