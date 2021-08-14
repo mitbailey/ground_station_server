@@ -21,6 +21,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <signal.h>
+#include "network.hpp"
 #include "gss.hpp"
 #include "meb_debug.hpp"
 
@@ -28,33 +29,26 @@ int main(int argc, char *argv[])
 {
     signal(SIGPIPE, SIG_IGN); // so that client does not die when server does
 
-    // Get network data and IP addresses.
-    rx_thread_data_t rx_thread_data[1];
+    // Create global.
+    global_data_t global[1] = {0};
 
-    for (int i = 0; i < 4; i++)
+    // Create NUM_PORTS network_data objects with their corresponding ports.
+    for (int i = 0; i < NUM_PORTS; i++)
     {
-        rx_thread_data->network_data[i] = new NetworkData();
-    }
-
-    // Set each thread's network_data to have the correct ipv4 and port.
-    for (int i = 0; i < 4; i++)
-    {
-        // memcpy(rx_thread_data->network_data[i]->listening_ipv4, ipv4, sizeof(ipv4));
-
-        rx_thread_data->network_data[i]->listening_port = LISTENING_PORT_BASE + (10 * i);
+        global->network_data[i] = new NetDataServer((NetPort)((int)NetPort::CLIENT + (10 * i)));
     }
 
     // Activate each thread's receive ability.
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < NUM_PORTS; i++)
     {
-        rx_thread_data->network_data[i]->rx_active = true;
+        global->network_data[i]->recv_active = true;
     }
 
     // Begin receiver threads.
-    // 0:Client, 1:RoofUHF, 2: RoofXB, 3: Haystack
-    for (int i = 0; i < 4; i++)
+    // 0:Client, 1:RoofUHF, 2: RoofXB, 3: Haystack, 4: Track
+    for (int i = 0; i < NUM_PORTS; i++)
     {
-        if (pthread_create(&rx_thread_data->pid[i], NULL, gss_rx_thread, rx_thread_data) != 0)
+        if (pthread_create(&global->pid[i], NULL, gss_network_rx_thread, global) != 0)
         {
             dbprintlf(FATAL "Thread %d failed to start.", i);
             return -1;
@@ -65,10 +59,10 @@ int main(int argc, char *argv[])
         }
     }
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < NUM_PORTS; i++)
     {
         void *status;
-        if (pthread_join(rx_thread_data->pid[i], &status) != 0)
+        if (pthread_join(global->pid[i], &status) != 0)
         {
             dbprintlf(RED_FG "Thread %d failed to join.", i);
         }
@@ -85,9 +79,9 @@ int main(int argc, char *argv[])
     // - Accept, perform relevant actions, and respond.
 
     // Finished.
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < NUM_PORTS; i++)
     {
-        delete rx_thread_data->network_data[i];
+        delete global->network_data[i];
     }
 
     return 1;

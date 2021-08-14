@@ -20,41 +20,17 @@
 #include "gss.hpp"
 #include "meb_debug.hpp"
 
-int gss_find_ipv4(char *buffer, ssize_t buffer_size)
+void *gss_network_rx_thread(void *global_vp)
 {
-    struct ifaddrs *addr, *temp_addr;
-    getifaddrs(&addr);
-    for (temp_addr = addr; temp_addr != NULL; temp_addr = temp_addr->ifa_next)
-    {
-        struct sockaddr_in *addr_in = (struct sockaddr_in *)temp_addr->ifa_addr;
-        inet_ntop(AF_INET, &addr_in->sin_addr, buffer, buffer_size);
-
-        // If the IP address is the IPv4...
-        if (buffer[0] == '1' && buffer[1] == '7' && buffer[2] == '2' && buffer[3] == '.')
-        {
-            dbprintlf(CYAN_FG "%s", buffer);
-            return 1;
-        }
-        else
-        {
-            dbprintlf(MAGENTA_FG "%s", buffer);
-        }
-    }
-
-    return 0;
-}
-
-void *gss_rx_thread(void *rx_thread_data_vp)
-{
-    rx_thread_data_t *rx_thread_data = (rx_thread_data_t *)rx_thread_data_vp;
+    global_data_t *global = (global_data_t *)global_vp;
 
     LISTEN_FOR listen_for = LF_ERROR;
     int t_index = -1;
     pthread_t thread_id = pthread_self();
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < NUM_PORTS; i++)
     {
-        if (thread_id == rx_thread_data->pid[i])
+        if (thread_id == global->pid[i])
         {
             listen_for = (LISTEN_FOR)i;
             t_index = i;
@@ -93,21 +69,28 @@ void *gss_rx_thread(void *rx_thread_data_vp)
 
         break;
     }
+    case LF_TRACK:
+    {
+        strcpy(t_tag, "[RXT_TRACK] ");
+        dbprintlf("%sThread (id:%lu) listening for Track.", t_tag, (unsigned long)thread_id);
+
+        break;
+    }
     case LF_ERROR:
     default:
     {
-        dbprintlf(FATAL "[RXT_ERROR] Thread (id:%lu) not listening for any valid sender.", (unsigned long)thread_id);
+        dbprintlf(FATAL "[RXT_ERROR] Thread (id:%lu) not listening for any valid sender (%d).", (unsigned long)thread_id, t_index);
         return NULL;
     }
     }
 
     // Makes my life easier.
-    NetworkData *network_data = rx_thread_data->network_data[t_index];
+    NetDataServer *network_data = global->network_data[t_index];
 
     // Socket prep.
     int listening_socket, socket_size;
     struct sockaddr_in listening_address, accepted_address;
-    int buffer_size = sizeof(NetworkFrame) + 16;
+    int buffer_size = sizeof(NetFrame) + 16;
     unsigned char buffer[buffer_size + 1];
     memset(buffer, 0x0, buffer_size);
 
@@ -125,7 +108,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     listening_address.sin_addr.s_addr = INADDR_ANY;
 
     // Calculate and set port.
-    network_data->listening_port = LISTENING_PORT_BASE + (10 * t_index);
+    network_data->listening_port = (int)NetPort::CLIENT + (10 * t_index);
     listening_address.sin_port = htons(network_data->listening_port);
 
     // Set the timeout for recv, which will allow us to reconnect to poorly disconnected clients.
@@ -151,7 +134,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
     // Listen.
     listen(listening_socket, 3);
 
-    while (network_data->rx_active)
+    while (network_data->recv_active)
     {
         int read_size = 0;
 
@@ -166,10 +149,10 @@ void *gss_rx_thread(void *rx_thread_data_vp)
             {
                 // Waiting for connection timed-out.
                 dbprintlf("%sTimed out (NETSTAT %d %d %d %d).", t_tag,
-                                  rx_thread_data->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
-                                  rx_thread_data->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
-                                  rx_thread_data->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
-                                  rx_thread_data->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0);
+                          global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
+                          global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
+                          global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
+                          global->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0);
                 network_data->connection_ready = false;
                 continue;
             }
@@ -187,7 +170,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
 
         // Read from the socket.
 
-        while (read_size >= 0 && network_data->rx_active)
+        while (read_size >= 0 && network_data->recv_active)
         {
             dbprintlf("%sBeginning recv... (last read: %d bytes)", t_tag, read_size);
             memset(buffer, 0x0, buffer_size);
@@ -202,80 +185,88 @@ void *gss_rx_thread(void *rx_thread_data_vp)
                 printf("(END)\n");
 
                 // Parse the data.
-                NetworkFrame *network_frame = (NetworkFrame *)buffer;
+                NetFrame *network_frame = (NetFrame *)buffer;
 
                 // Check if we've received data in the form of a NetworkFrame.
-                if (network_frame->checkIntegrity() < 0)
+                if (network_frame->validate() < 0)
                 {
-                    dbprintlf("%sIntegrity check failed (%d).", t_tag, network_frame->checkIntegrity());
+                    dbprintlf("%sIntegrity check failed (%d).", t_tag, network_frame->validate());
                     continue;
                 }
                 dbprintlf("%sIntegrity check successful.", t_tag);
 
-                switch (network_frame->getEndpoint())
+                switch (network_frame->getDestination())
                 {
-                case CS_ENDPOINT_SERVER:
+                case NetVertex::SERVER:
                 {
                     // Ride ends here, at the server.
                     // NOTE: Parse and do something. maybe, we'll see.
                     dbprintlf(CYAN_FG "Received a packet for the server from ID:%d!", t_index);
-                    if (network_frame->getType() == CS_TYPE_NULL)
+                    if (network_frame->getType() == NetType::POLL)
                     {
-                        dbprintlf("Received a null (status) packet, responding.");
+                        dbprintlf("Received a status polling packet, responding.");
 
                         // Send the null frame to whomever asked for it.
-                        network_frame->storePayload((NETWORK_FRAME_ENDPOINT)t_index, NULL, 0);
+                        NetFrame *netstat_frame = new NetFrame(NULL, 0, NetType::POLL, (NetVertex)t_index);
 
-                        network_frame->setNetstat(
-                            rx_thread_data->network_data[LF_CLIENT]->connection_ready,
-                            rx_thread_data->network_data[LF_ROOF_UHF]->connection_ready,
-                            rx_thread_data->network_data[LF_ROOF_XBAND]->connection_ready,
-                            rx_thread_data->network_data[LF_HAYSTACK]->connection_ready);
+                        uint8_t netstat = 0x0;
+                        netstat |= 0x80 * (global->network_data[LF_CLIENT]->connection_ready);
+                        netstat |= 0x40 * (global->network_data[LF_ROOF_UHF]->connection_ready);
+                        netstat |= 0x20 * (global->network_data[LF_ROOF_XBAND]->connection_ready);
+                        netstat |= 0x10 * (global->network_data[LF_HAYSTACK]->connection_ready);
+                        netstat |= 0x8 * (global->network_data[LF_TRACK]->connection_ready);
 
-                        dbprintlf("NETSTAT %d %d %d %d",
-                                  rx_thread_data->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
-                                  rx_thread_data->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
-                                  rx_thread_data->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
-                                  rx_thread_data->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0);
+                        netstat_frame->setNetstat(netstat);
+
+                        dbprintlf("NETSTAT %d %d %d %d %d",
+                                  global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_TRACK]->connection_ready ? 1 : 0);
 
                         // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
-                        if (network_frame->sendFrame(rx_thread_data->network_data[(int)network_frame->getEndpoint()]) < 0)
+                        if (netstat_frame->sendFrame(global->network_data[t_index]) < 0)
                         {
-                            dbprintlf(RED_FG "Send failed!");
+                            dbprintlf(RED_FG "Send failed.");
                         }
                     }
                     else
                     {
-                        dbprintlf(RED_FG "Frame addressed to server but was not a Null (status) frame!");
+                        dbprintlf(RED_FG "Frame addressed to server but was not a polling status frame.");
                     }
                     break;
                 }
-                case CS_ENDPOINT_CLIENT:
-                case CS_ENDPOINT_ROOFUHF:
-                case CS_ENDPOINT_ROOFXBAND:
-                case CS_ENDPOINT_HAYSTACK:
+                case NetVertex::CLIENT:
+                case NetVertex::ROOFUHF:
+                case NetVertex::ROOFXBAND:
+                case NetVertex::HAYSTACK:
+                case NetVertex::TRACK:
                 {
                     dbprintlf("Passing along frame.");
-                    network_frame->setNetstat(
-                        rx_thread_data->network_data[LF_CLIENT]->connection_ready,
-                        rx_thread_data->network_data[LF_ROOF_UHF]->connection_ready,
-                        rx_thread_data->network_data[LF_ROOF_XBAND]->connection_ready,
-                        rx_thread_data->network_data[LF_HAYSTACK]->connection_ready);
+                    uint8_t netstat = 0x0;
+                    netstat |= 0x80 * (global->network_data[LF_CLIENT]->connection_ready);
+                    netstat |= 0x40 * (global->network_data[LF_ROOF_UHF]->connection_ready);
+                    netstat |= 0x20 * (global->network_data[LF_ROOF_XBAND]->connection_ready);
+                    netstat |= 0x10 * (global->network_data[LF_HAYSTACK]->connection_ready);
+                    netstat |= 0x8 * (global->network_data[LF_TRACK]->connection_ready);
 
-                    dbprintlf("NETSTAT %d %d %d %d",
-                              rx_thread_data->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
-                              rx_thread_data->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
-                              rx_thread_data->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
-                              rx_thread_data->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0);
+                    network_frame->setNetstat(netstat);
 
-                    // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
-                    if (network_frame->sendFrame(rx_thread_data->network_data[(int)network_frame->getEndpoint()]) < 0)
+                    dbprintlf("NETSTAT %d %d %d %d %d",
+                              global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
+                              global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
+                              global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
+                              global->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0,
+                              global->network_data[LF_TRACK]->connection_ready ? 1 : 0);
+
+                    // Transmit the NetFrame, sending the network_data for the connection down which we would like it to be sent.
+                    if (network_frame->sendFrame(global->network_data[(int)network_frame->getDestination()]) < 0)
                     {
-                        dbprintlf(RED_FG "Send failed!");
+                        dbprintlf(RED_FG "Send failed.");
                     }
                     break;
                 }
-                case CS_ENDPOINT_ERROR:
                 default:
                 {
                     // Probably received nothing.
@@ -302,7 +293,7 @@ void *gss_rx_thread(void *rx_thread_data_vp)
         }
     }
 
-    if (!rx_thread_data->network_data[t_index]->rx_active)
+    if (!global->network_data[t_index]->recv_active)
     {
         dbprintlf(YELLOW_FG "%sReceive deactivated.", t_tag);
     }

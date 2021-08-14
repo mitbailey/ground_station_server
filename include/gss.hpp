@@ -17,6 +17,7 @@
 
 #define LISTENING_IP_ADDRESS "127.0.0.1" // hostname -I
 #define LISTENING_SOCKET_TIMEOUT 20
+#define NUM_PORTS 5 // How many ports to open
 
 /**
  * @brief Enumeration representing what client each RX thread is listening for.
@@ -28,7 +29,8 @@ enum LISTEN_FOR
     LF_CLIENT = 0,
     LF_ROOF_UHF,
     LF_ROOF_XBAND,
-    LF_HAYSTACK
+    LF_HAYSTACK,
+    LF_TRACK
 };
 
 /**
@@ -37,21 +39,9 @@ enum LISTEN_FOR
  */
 typedef struct
 {
-    NetworkData *network_data[4];
+    NetDataServer *network_data[4];
     pthread_t pid[4];
-
-    phy_config_t roofxband_config_status[1];
-    phy_config_t haystack_config_status[1];
-} rx_thread_data_t;
-
-/**
- * @brief Automatically finds the local machine's IPv4.
- * 
- * @param buffer Buffer to store the IPv4 as a c-string.
- * @param buffer_size Size of passed buffer.
- * @return int 1 if successful, 0 if an IPv4 could not be found.
- */
-int gss_find_ipv4(char *buffer, ssize_t buffer_size);
+} global_data_t;
 
 /**
  * @brief Thread which waits to receive network data.
@@ -60,7 +50,7 @@ int gss_find_ipv4(char *buffer, ssize_t buffer_size);
  * 
  * @return void* NULL
  */
-void *gss_rx_thread(void *);
+void *gss_network_rx_thread(void *);
 
 /**
  * @brief Generates a 16-bit CRC for the given data.
