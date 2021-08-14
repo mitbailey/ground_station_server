@@ -219,12 +219,12 @@ void *gss_network_rx_thread(void *global_vp)
 
                         netstat_frame->setNetstat(netstat);
 
-                        dbprintlf("%sNETSTAT %d %d %d %d %d", t_tag,
+                        dbprintlf("%sNETSTAT %d %d %d %d %d (%d)", t_tag,
                                   global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
                                   global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
                                   global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
                                   global->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0,
-                                  global->network_data[LF_TRACK]->connection_ready ? 1 : 0);
+                                  global->network_data[LF_TRACK]->connection_ready ? 1 : 0, netstat);
 
                         // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
                         if (netstat_frame->sendFrame(global->network_data[t_index]) < 0)
