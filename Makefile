@@ -5,7 +5,7 @@ TARGET = server.out
 
 all: $(COBJS)
 	$(CXX) $(CXXFLAGS) $(COBJS) -o $(TARGET)
-	./$(TARGET)
+	sudo ./$(TARGET)
 
 %.o: %.c
 	$(CXX) $(CXXFLAGS) -o $@ -c $<
