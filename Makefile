@@ -1,6 +1,6 @@
 CXX = g++
 COBJS = src/main.o src/gss.o network/network.o
-CXXFLAGS = -I ./include/ -I ./network/ -Wall -pthread
+CXXFLAGS = -I ./include/ -I ./network/ -Wall -pthread -DGSNID=\"server\"
 TARGET = server.out
 
 all: $(COBJS)
