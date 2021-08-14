@@ -39,8 +39,8 @@ enum LISTEN_FOR
  */
 typedef struct
 {
-    NetDataServer *network_data[4];
-    pthread_t pid[4];
+    NetDataServer *network_data[NUM_PORTS];
+    pthread_t pid[NUM_PORTS];
 } global_data_t;
 
 /**
