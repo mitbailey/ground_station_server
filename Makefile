@@ -16,3 +16,4 @@ clean:
 	$(RM) *.out
 	$(RM) *.o
 	$(RM) src/*.o
+	$(RM) network/*.o
