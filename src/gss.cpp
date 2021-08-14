@@ -148,11 +148,12 @@ void *gss_network_rx_thread(void *global_vp)
             if (errno == EAGAIN)
             {
                 // Waiting for connection timed-out.
-                dbprintlf("%sTimed out (NETSTAT %d %d %d %d).", t_tag,
-                          global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
-                          global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
-                          global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
-                          global->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0);
+                dbprintlf("%sTimed out (NETSTAT %d %d %d %d %d).", t_tag,
+                                  global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_TRACK]->connection_ready ? 1 : 0);
                 network_data->connection_ready = false;
                 continue;
             }
@@ -218,7 +219,7 @@ void *gss_network_rx_thread(void *global_vp)
 
                         netstat_frame->setNetstat(netstat);
 
-                        dbprintlf("NETSTAT %d %d %d %d %d",
+                        dbprintlf("%sNETSTAT %d %d %d %d %d", t_tag,
                                   global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
                                   global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
                                   global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
@@ -228,12 +229,12 @@ void *gss_network_rx_thread(void *global_vp)
                         // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
                         if (netstat_frame->sendFrame(global->network_data[t_index]) < 0)
                         {
-                            dbprintlf(RED_FG "Send failed.");
+                            dbprintlf(RED_FG "%sSend failed.", t_tag);
                         }
                     }
                     else
                     {
-                        dbprintlf(RED_FG "Frame addressed to server but was not a polling status frame.");
+                        dbprintlf(RED_FG "%sFrame addressed to server but was not a polling status frame.", t_tag);
                     }
                     break;
                 }
@@ -243,7 +244,7 @@ void *gss_network_rx_thread(void *global_vp)
                 case NetVertex::HAYSTACK:
                 case NetVertex::TRACK:
                 {
-                    dbprintlf("Passing along frame.");
+                    dbprintlf("%sPassing along frame.", t_tag);
                     uint8_t netstat = 0x0;
                     netstat |= 0x80 * (global->network_data[LF_CLIENT]->connection_ready);
                     netstat |= 0x40 * (global->network_data[LF_ROOF_UHF]->connection_ready);
@@ -253,7 +254,7 @@ void *gss_network_rx_thread(void *global_vp)
 
                     network_frame->setNetstat(netstat);
 
-                    dbprintlf("NETSTAT %d %d %d %d %d",
+                    dbprintlf("%sNETSTAT %d %d %d %d %d", t_tag,
                               global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
                               global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
                               global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
