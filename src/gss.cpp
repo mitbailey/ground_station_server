@@ -149,11 +149,11 @@ void *gss_network_rx_thread(void *global_vp)
             {
                 // Waiting for connection timed-out.
                 dbprintlf("%sTimed out (NETSTAT %d %d %d %d %d).", t_tag,
-                                  global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
-                                  global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
-                                  global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
-                                  global->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0,
-                                  global->network_data[LF_TRACK]->connection_ready ? 1 : 0);
+                          global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
+                          global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
+                          global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
+                          global->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0,
+                          global->network_data[LF_TRACK]->connection_ready ? 1 : 0);
                 network_data->connection_ready = false;
                 continue;
             }
@@ -244,28 +244,36 @@ void *gss_network_rx_thread(void *global_vp)
                 case NetVertex::HAYSTACK:
                 case NetVertex::TRACK:
                 {
-                    dbprintlf("%sPassing along frame.", t_tag);
-                    uint8_t netstat = 0x0;
-                    netstat |= 0x80 * (global->network_data[LF_CLIENT]->connection_ready);
-                    netstat |= 0x40 * (global->network_data[LF_ROOF_UHF]->connection_ready);
-                    netstat |= 0x20 * (global->network_data[LF_ROOF_XBAND]->connection_ready);
-                    netstat |= 0x10 * (global->network_data[LF_HAYSTACK]->connection_ready);
-                    netstat |= 0x8 * (global->network_data[LF_TRACK]->connection_ready);
-
-                    network_frame->setNetstat(netstat);
-
-                    dbprintlf("%sNETSTAT %d %d %d %d %d", t_tag,
-                              global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
-                              global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
-                              global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
-                              global->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0,
-                              global->network_data[LF_TRACK]->connection_ready ? 1 : 0);
-
-                    // Transmit the NetFrame, sending the network_data for the connection down which we would like it to be sent.
-                    if (network_frame->sendFrame(global->network_data[(int)network_frame->getDestination()]) < 0)
+                    if (global->network_data[(int)network_frame->getDestination()]->connection_ready)
                     {
-                        dbprintlf(RED_FG "Send failed.");
+                        dbprintlf("%sPassing along frame.", t_tag);
+                        uint8_t netstat = 0x0;
+                        netstat |= 0x80 * (global->network_data[LF_CLIENT]->connection_ready);
+                        netstat |= 0x40 * (global->network_data[LF_ROOF_UHF]->connection_ready);
+                        netstat |= 0x20 * (global->network_data[LF_ROOF_XBAND]->connection_ready);
+                        netstat |= 0x10 * (global->network_data[LF_HAYSTACK]->connection_ready);
+                        netstat |= 0x8 * (global->network_data[LF_TRACK]->connection_ready);
+
+                        network_frame->setNetstat(netstat);
+
+                        dbprintlf("%sNETSTAT %d %d %d %d %d", t_tag,
+                                  global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_ROOF_UHF]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_ROOF_XBAND]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_HAYSTACK]->connection_ready ? 1 : 0,
+                                  global->network_data[LF_TRACK]->connection_ready ? 1 : 0);
+
+                        // Transmit the NetFrame, sending the network_data for the connection down which we would like it to be sent.
+                        if (network_frame->sendFrame(global->network_data[(int)network_frame->getDestination()]) < 0)
+                        {
+                            dbprintlf(RED_FG "%sSend failed (from %d to %d).", t_tag, (int)network_frame->getOrigin(), (int)network_frame->getDestination());
+                        }
                     }
+                    else
+                    {
+                        dbprintlf(RED_FG "%sCannot pass frame from ID:%d to ID:%d since the connection is not ready.", t_tag, (int)network_frame->getOrigin(), (int)network_frame->getDestination());
+                    }
+
                     break;
                 }
                 default:
