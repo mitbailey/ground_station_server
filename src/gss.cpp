@@ -229,7 +229,7 @@ void *gss_network_rx_thread(void *global_vp)
                         // Transmit the clientserver_frame, sending the network_data for the connection down which we would like it to be sent.
                         if (netstat_frame->sendFrame(global->network_data[t_index]) < 0)
                         {
-                            dbprintlf(RED_FG "%sSend failed.", t_tag);
+                            dbprintlf(RED_FG "%sNetStat frame send to %d failed.", t_tag, t_index);
                         }
                     }
                     else
