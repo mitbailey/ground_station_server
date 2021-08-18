@@ -173,37 +173,24 @@ void *gss_network_rx_thread(void *global_vp)
 
         while (read_size >= 0 && network_data->recv_active)
         {
-            dbprintlf("%sBeginning recv... (last read: %d bytes)", t_tag, read_size);
-            memset(buffer, 0x0, buffer_size);
-            read_size = recv(network_data->socket, buffer, buffer_size, 0);
+            dbprintlf("%sBeginning recv... (last read: %d bytes of payload)", t_tag, read_size);
+
+            NetFrame *netframe = new NetFrame();
+            read_size = netframe->recvFrame(network_data);
+
             if (read_size > 0)
             {
-                dbprintf("%sRECEIVED (hex): ", t_tag);
-                for (int i = 0; i < read_size; i++)
-                {
-                    printf("%02x", buffer[i]);
-                }
-                printf("(END)\n");
+                dbprintlf("Received the following NetFrame:");
+                netframe->print();
 
-                // Parse the data.
-                NetFrame *network_frame = (NetFrame *)buffer;
-
-                // Check if we've received data in the form of a NetworkFrame.
-                if (network_frame->validate() < 0)
-                {
-                    dbprintlf("%sIntegrity check failed (%d).", t_tag, network_frame->validate());
-                    continue;
-                }
-                dbprintlf("%sIntegrity check successful.", t_tag);
-
-                switch (network_frame->getDestination())
+                switch (netframe->getDestination())
                 {
                 case NetVertex::SERVER:
                 {
                     // Ride ends here, at the server.
                     // NOTE: Parse and do something. maybe, we'll see.
                     dbprintlf(CYAN_FG "Received a packet for the server from ID:%d!", t_index);
-                    if (network_frame->getType() == NetType::POLL)
+                    if (netframe->getType() == NetType::POLL)
                     {
                         dbprintlf("Received a status polling packet, responding.");
 
@@ -244,7 +231,7 @@ void *gss_network_rx_thread(void *global_vp)
                 case NetVertex::HAYSTACK:
                 case NetVertex::TRACK:
                 {
-                    if (global->network_data[(int)network_frame->getDestination()]->connection_ready)
+                    if (global->network_data[(int)netframe->getDestination()]->connection_ready)
                     {
                         dbprintlf("%sPassing along frame.", t_tag);
                         uint8_t netstat = 0x0;
@@ -254,7 +241,7 @@ void *gss_network_rx_thread(void *global_vp)
                         netstat |= 0x10 * (global->network_data[LF_HAYSTACK]->connection_ready);
                         netstat |= 0x8 * (global->network_data[LF_TRACK]->connection_ready);
 
-                        network_frame->setNetstat(netstat);
+                        netframe->setNetstat(netstat);
 
                         dbprintlf("%sNETSTAT %d %d %d %d %d", t_tag,
                                   global->network_data[LF_CLIENT]->connection_ready ? 1 : 0,
@@ -264,14 +251,14 @@ void *gss_network_rx_thread(void *global_vp)
                                   global->network_data[LF_TRACK]->connection_ready ? 1 : 0);
 
                         // Transmit the NetFrame, sending the network_data for the connection down which we would like it to be sent.
-                        if (network_frame->sendFrame(global->network_data[(int)network_frame->getDestination()]) < 0)
+                        if (netframe->sendFrame(global->network_data[(int)netframe->getDestination()]) < 0)
                         {
-                            dbprintlf(RED_FG "%sSend failed (from %d to %d).", t_tag, (int)network_frame->getOrigin(), (int)network_frame->getDestination());
+                            dbprintlf(RED_FG "%sSend failed (from %d to %d).", t_tag, (int)netframe->getOrigin(), (int)netframe->getDestination());
                         }
                     }
                     else
                     {
-                        dbprintlf(RED_FG "%sCannot pass frame from ID:%d to ID:%d since the connection is not ready.", t_tag, (int)network_frame->getOrigin(), (int)network_frame->getDestination());
+                        dbprintlf(RED_FG "%sCannot pass frame from ID:%d to ID:%d since the connection is not ready.", t_tag, (int)netframe->getOrigin(), (int)netframe->getDestination());
                     }
 
                     break;
@@ -288,7 +275,7 @@ void *gss_network_rx_thread(void *global_vp)
                 break;
             }
         }
-        if (read_size == 0)
+        if (read_size == -404)
         {
             dbprintlf(CYAN_BG "%sClient closed connection.", t_tag);
             network_data->connection_ready = false;
