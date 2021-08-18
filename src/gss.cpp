@@ -178,7 +178,7 @@ void *gss_network_rx_thread(void *global_vp)
             NetFrame *netframe = new NetFrame();
             read_size = netframe->recvFrame(network_data);
 
-            if (read_size > 0)
+            if (read_size >= 0)
             {
                 dbprintlf("Received the following NetFrame:");
                 netframe->print();
@@ -274,6 +274,9 @@ void *gss_network_rx_thread(void *global_vp)
             {
                 break;
             }
+
+            delete netframe;
+
         }
         if (read_size == -404)
         {
