@@ -1,3 +1,5 @@
+Deprecated, superseded by https://github.com/SPACE-HAUC/gs_server.
+
 # ground_station_server
 
 Code for SPACE-HAUC's Ground Station Server.
